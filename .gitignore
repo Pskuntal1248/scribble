@@ -1,0 +1,84 @@
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea/
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Java ###
+*.class
+*.log
+*.jar
+*.war
+*.ear
+*.zip
+*.tar.gz
+*.rar
+hs_err_pid*
+replay_pid*
+
+### OS ###
+.DS_Store
+Thumbs.db
+*~
+*.swp
+*.swo
+
+### Node.js (Frontend) ###
+scribble-frontend/node_modules/
+scribble-frontend/dist/
+scribble-frontend/.env
+scribble-frontend/.env.local
+scribble-frontend/.env.production
+scribble-frontend/.env.development.local
+scribble-frontend/.env.test.local
+scribble-frontend/.env.production.local
+scribble-frontend/npm-debug.log*
+scribble-frontend/yarn-debug.log*
+scribble-frontend/yarn-error.log*
+scribble-frontend/pnpm-debug.log*
+scribble-frontend/.vite/
+
+### Logs ###
+logs/
+*.log
+
+### Temporary files ###
+*.tmp
+*.bak
+local.properties
