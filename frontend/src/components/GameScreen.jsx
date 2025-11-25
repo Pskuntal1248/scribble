@@ -575,9 +575,9 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
 
                 <div className="h-10 w-px bg-gray-200" />
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 shrink-0">
                   <label className="text-xs font-bold uppercase text-gray-400">Colors</label>
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
                     {colorPalette.map((color, index) => (
                       <motion.button
                         key={color}
