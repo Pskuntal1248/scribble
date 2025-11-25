@@ -44,20 +44,7 @@ function App() {
   }
 
   return (
-    <div className="App">
-      <h1 className="game-title">
-        <span style={{color: '#FFD700'}}>S</span>
-        <span style={{color: '#FFB6C1'}}>c</span>
-        <span style={{color: '#87CEEB'}}>r</span>
-        <span style={{color: '#FFD700'}}>i</span>
-        <span style={{color: '#98FB98'}}>b</span>
-        <span style={{color: '#FFB6C1'}}>b</span>
-        <span style={{color: '#87CEEB'}}>l</span>
-        <span style={{color: '#FFD700'}}>e</span>
-        <span style={{color: '#FFB6C1'}}>r</span>
-        <span style={{color: '#98FB98'}}>s</span>
-      </h1>
-
+    <>
       {screen === 'login' && (
         <LoginScreen
           username={username}
@@ -102,7 +89,7 @@ function App() {
           }}
         />
       )}
-    </div>
+    </>
   );
 }
 

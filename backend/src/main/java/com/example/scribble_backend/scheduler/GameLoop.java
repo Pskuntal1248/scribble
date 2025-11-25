@@ -41,36 +41,33 @@ public class GameLoop {
         for (GameRoom room : gameService.getAllRooms()) {
             if (room.isGameRunning() && room.getRoundTime() > 0) {
                 
-                // Decrement timer
+               
                 room.setRoundTime(room.getRoundTime() - 1);
 
-                // --- SMART HINT SYSTEM ---
-                // Reveal hints at 45s, 30s, and 15s remaining
+             
                 if (room.getRoundTime() == 45 || room.getRoundTime() == 30 || room.getRoundTime() == 15) {
                     revealRandomLetter(room);
                     
                     String hintWord = room.getHintWord();
                     System.out.println(">>> HINT REVEALED at " + room.getRoundTime() + "s: " + hintWord);
                     
-                    // CRITICAL: Broadcast updated state so hints update in word display
-                    // Don't send HINT to chat, it shows in word display automatically
+                  
                     messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
                 }
 
-                // Broadcast time every second
+               
                 messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/time", room.getRoundTime());
 
-                // Check if all players guessed (early round end)
+              
                 if (room.allPlayersGuessed()) {
                     System.out.println(">>> All players guessed! Ending round early.");
                     endRoundAndStartNext(room);
                 }
                 
-                // Round ended by time
+        
                 if (room.getRoundTime() == 0) {
                     String oldWord = room.getCurrentWord();
-                    
-                    // Send time's up message
+               
                     ChatMessage timeUpMsg = ChatMessage.builder()
                             .type(ChatMessage.MessageType.SYSTEM)
                             .sender("System")
@@ -88,7 +85,7 @@ public class GameLoop {
         String word = room.getCurrentWord();
         if (word == null || word.isEmpty()) return;
 
-        // Find all unrevealed letter positions (excluding spaces and special chars)
+
         java.util.List<Integer> unrevealedPositions = new java.util.ArrayList<>();
         for (int i = 0; i < word.length(); i++) {
             char c = word.charAt(i);
@@ -130,7 +127,7 @@ public class GameLoop {
         // Start new round (or end game)
         gameService.startNewRound(room);
         
-        // Check if game ended
+       
         if (!room.isGameRunning()) {
             ChatMessage gameOverMsg = ChatMessage.builder()
                     .type(ChatMessage.MessageType.SYSTEM)
@@ -140,7 +137,7 @@ public class GameLoop {
             messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", gameOverMsg);
         }
         
-        // Broadcast new state
+    
         messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
     }
     

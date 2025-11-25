@@ -37,11 +37,11 @@ public class WebSocketEventListener {
                 
                 System.out.println(">>> Player '" + playerName + "' disconnected from room " + room.getRoomId());
                 
-                // Remove player from room
+              
                 boolean removed = gameService.removePlayerFromRoom(room.getRoomId(), sessionId);
                 
                 if (removed) {
-                    // Check if room is now empty
+                  
                     if (room.getPlayers().isEmpty()) {
                         System.out.println(">>> Room " + room.getRoomId() + " is now EMPTY. Removing from server.");
                         gameService.removeRoom(room.getRoomId());
