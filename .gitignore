@@ -60,19 +60,19 @@ Thumbs.db
 *.swo
 
 ### Node.js (Frontend) ###
-scribble-frontend/node_modules/
-scribble-frontend/dist/
-scribble-frontend/.env
-scribble-frontend/.env.local
-scribble-frontend/.env.production
-scribble-frontend/.env.development.local
-scribble-frontend/.env.test.local
-scribble-frontend/.env.production.local
-scribble-frontend/npm-debug.log*
-scribble-frontend/yarn-debug.log*
-scribble-frontend/yarn-error.log*
-scribble-frontend/pnpm-debug.log*
-scribble-frontend/.vite/
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+frontend/.vite/
 
 ### Logs ###
 logs/
