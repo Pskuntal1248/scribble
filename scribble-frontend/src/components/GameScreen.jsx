@@ -239,199 +239,152 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
   }
 
   return (
-    <div className="game-screen-new">
-      {/* Top Header */}
-      <div className="game-header">
-        <div className="header-left">
-          <div className="timer-box">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
-              <path d="M12 6v6l4 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <span className="timer-value">{timer}s</span>
-          </div>
-          <div className="turn-info">{getTurnInfo()}</div>
+    <div className="game-screen-classic">
+      {/* Header */}
+      <div className="classic-header">
+        <div className="header-section">
+          <div className="round-info">{getTurnInfo()}</div>
         </div>
         
-        <div className="header-center">
-          <div className="word-box">
-            <div className="word-label">{amIDrawer ? '🎨 Your Word' : '🤔 Guess'}</div>
-            <div className="word-text">
-              {amIDrawer ? (gameState?.currentWord || 'WAITING...') : (gameState?.hintWord || '_ _ _ _ _')}
-            </div>
-          </div>
+        <div className="word-display">
+          {amIDrawer ? (gameState?.currentWord || 'WAITING...') : (gameState?.hintWord || '_ _ _ _ _')}
         </div>
         
-        <div className="header-right">
-          <div className="room-badge">
-            <span className="room-label">ROOM</span>
-            <span className="room-id">{roomId}</span>
-          </div>
-          <button className="start-btn" onClick={startGame}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-            START
-          </button>
+        <div className="timer-display">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span>{timer}</span>
         </div>
       </div>
 
-      {/* Main Game Area */}
-      <div className="game-main">
+      {/* Main Layout */}
+      <div className="classic-main">
         {/* Left Sidebar - Leaderboard */}
-        <div className="sidebar sidebar-left">
-          <div className="sidebar-header">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
-            </svg>
-            <span>LEADERBOARD</span>
-          </div>
-          <div className="leaderboard">
-            {gameState?.players?.sort((a, b) => b.score - a.score).map((player, index) => (
-              <div key={player.sessionId} className={`leader-item ${player.sessionId === mySessionId ? 'me' : ''} rank-${index + 1}`}>
-                <div className="rank-badge">
-                  {index === 0 ? '👑' : index + 1}
+        <div className="classic-sidebar-left">
+          {gameState?.players?.sort((a, b) => b.score - a.score).map((player, index) => (
+            <div key={player.sessionId} className={`player-card ${player.sessionId === mySessionId ? 'me' : ''}`}>
+              <div className="player-rank">#{index + 1}</div>
+              <div className="player-details">
+                <div className="player-name" style={{ color: player.sessionId === mySessionId ? '#1E88E5' : 'inherit' }}>
+                  {player.username}
                 </div>
-                <div className="player-info">
-                  <div className="player-name">{player.username}</div>
-                  <div className="player-score">{player.score} pts</div>
-                </div>
-                {player.sessionId === gameState?.currentDrawerSessionId && (
-                  <div className="drawing-badge">🎨</div>
-                )}
+                <div className="player-score">Points: {player.score}</div>
               </div>
-            ))}
-          </div>
+              {player.sessionId === gameState?.currentDrawerSessionId && (
+                <div className="drawer-icon">✏️</div>
+              )}
+            </div>
+          ))}
         </div>
 
         {/* Center - Canvas */}
-        <div className="canvas-container">
-          <div className={`canvas-box ${amIDrawer ? 'drawing-mode' : 'guessing-mode'}`}>
+        <div className="classic-center">
+          <div className="canvas-wrapper">
             <canvas
               ref={canvasRef}
-              className="main-canvas"
+              className="game-canvas"
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
             />
             {!amIDrawer && (
-              <div className="spectator-overlay">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="rgba(255,255,255,0.5)">
-                  <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                </svg>
-                <p>Watch & Guess!</p>
+              <div className="overlay-text">
+                {gameState?.currentDrawerSessionId ? 'GUESS THE WORD!' : 'WAITING FOR PLAYERS...'}
               </div>
             )}
           </div>
-          
+
+          {/* Toolbar - Only visible to drawer */}
           {amIDrawer && (
-            <div className="tools-bar">
-              <div className="tool-group">
-                <div className="tool-label">COLORS</div>
-                <div className="colors-grid">
-                  {colors.map(color => (
-                    <button
-                      key={color}
-                      className={`color-btn ${currentColor === color ? 'active' : ''}`}
-                      style={{ backgroundColor: color }}
-                      onClick={() => setCurrentColor(color)}
-                      title={color === '#FFFFFF' ? 'Eraser' : color}
-                    />
-                  ))}
-                </div>
+            <div className="classic-toolbar">
+              <div className="colors-section">
+                {colors.map(color => (
+                  <div
+                    key={color}
+                    className={`color-swatch ${currentColor === color ? 'active' : ''}`}
+                    style={{ backgroundColor: color }}
+                    onClick={() => setCurrentColor(color)}
+                    title={color}
+                  />
+                ))}
               </div>
               
-              <div className="tool-divider"></div>
-              
-              <div className="tool-group">
-                <div className="tool-label">SIZE</div>
-                <div className="size-grid">
-                  {[2, 5, 10, 15].map(size => (
-                    <button
-                      key={size}
-                      className={`size-btn-new ${lineWidth === size ? 'active' : ''}`}
-                      onClick={() => setLineWidth(size)}
-                    >
-                      <div className="size-dot" style={{ 
-                        width: `${size * 1.5}px`, 
-                        height: `${size * 1.5}px` 
-                      }}></div>
-                    </button>
-                  ))}
-                </div>
+              <div className="tools-section">
+                <button 
+                  className={`tool-btn ${currentColor === '#FFFFFF' ? 'active' : ''}`} 
+                  onClick={() => setCurrentColor('#FFFFFF')}
+                  title="Eraser"
+                >
+                  🧹
+                </button>
+                <button className="tool-btn" onClick={clearCanvas} title="Clear Canvas">
+                  🗑️
+                </button>
+                
+                <div style={{ width: '1px', height: '24px', background: '#ddd', margin: '0 5px' }}></div>
+                
+                {[2, 5, 10, 15].map(size => (
+                  <button
+                    key={size}
+                    className={`size-btn ${lineWidth === size ? 'active' : ''}`}
+                    onClick={() => setLineWidth(size)}
+                    title={`Size ${size}`}
+                  >
+                    <div className="size-circle" style={{ width: size, height: size }}></div>
+                  </button>
+                ))}
               </div>
-              
-              <div className="tool-divider"></div>
-              
-              <button className="clear-btn" onClick={clearCanvas}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                </svg>
-                CLEAR
-              </button>
             </div>
           )}
         </div>
 
         {/* Right Sidebar - Chat */}
-        <div className="sidebar sidebar-right">
-          <div className="sidebar-header">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z"/>
-            </svg>
-            <span>CHAT</span>
-          </div>
-          <div className="chat-box">
+        <div className="classic-sidebar-right">
+          <div className="chat-header">Chat Room</div>
+          <div className="chat-messages">
             {messages.map((msg, index) => (
               <div
                 key={index}
-                className={`chat-msg ${msg.type === 'SYSTEM' ? 'system' : msg.type === 'GUESS_CORRECT' ? 'correct' : 'normal'}`}
+                className={`chat-message ${msg.type === 'SYSTEM' ? 'system' : msg.type === 'GUESS_CORRECT' ? 'correct' : ''}`}
               >
-                <span className="msg-sender">{msg.sender}:</span>
-                <span className="msg-text">{msg.content}</span>
+                {msg.type !== 'SYSTEM' && <b>{msg.sender}:</b>}
+                <span>{msg.content}</span>
               </div>
             ))}
             <div ref={messagesEndRef} />
           </div>
-          <div className="chat-input-box">
+          <div className="chat-input-area">
             <input
               type="text"
-              className="chat-field"
-              placeholder={amIDrawer ? "🎨 You're drawing!" : "Type your guess..."}
+              className="chat-input"
+              placeholder={amIDrawer ? "Type here to chat..." : "Type your guess here..."}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-              disabled={amIDrawer}
+              disabled={amIDrawer && false} /* Allow drawer to chat but maybe not guess? Logic says drawer can chat */
             />
-            <button className="send-btn" onClick={sendMessage} disabled={amIDrawer}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-              </svg>
-            </button>
           </div>
         </div>
       </div>
 
       {/* Game Over Modal */}
       {showGameOver && (
-        <div className="game-over-screen">
-          <div className="game-over-card">
-            <div className="trophy-icon">🏆</div>
-            <h1 className="game-over-title">Game Over!</h1>
-            <div className="final-rankings">
+        <div className="game-over-modal">
+          <div className="game-over-content">
+            <h1>GAME OVER</h1>
+            <div className="final-scores">
               {gameState?.players?.sort((a, b) => b.score - a.score).map((player, index) => (
-                <div key={player.sessionId} className={`final-rank rank-${index + 1}`}>
-                  <div className="final-rank-badge">
-                    {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                  </div>
-                  <div className="final-player-name">{player.username}</div>
-                  <div className="final-player-score">{player.score}</div>
+                <div key={player.sessionId} className={`final-score-item ${index === 0 ? 'winner' : ''}`}>
+                  <span>#{index + 1} {player.username}</span>
+                  <span>{player.score} pts</span>
                 </div>
               ))}
             </div>
-            <button className="menu-btn" onClick={onBack}>
-              Return to Menu
+            <button className="btn-primary" onClick={onBack}>
+              BACK TO HOME
             </button>
           </div>
         </div>
