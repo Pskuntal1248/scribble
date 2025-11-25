@@ -1,0 +1,9 @@
+# Build command for Render
+# Render will automatically detect Dockerfile and build it
+
+# Environment variables needed on Render:
+# - PORT (automatically set by Render)
+# - APP_SELF_PING_URL (your Render app URL, e.g., https://scribble-backend.onrender.com)
+
+# This file is for documentation purposes
+# Render will use the Dockerfile automatically

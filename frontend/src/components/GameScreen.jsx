@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 
+// Get backend URL from environment variables
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+
 export default function GameScreen({ stompClient, username, roomId, mySessionId, onBack }) {
   // Core game state
   const [gameState, setGameState] = useState(null)
@@ -25,7 +28,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
   useEffect(() => {
     const fetchInitialState = async () => {
       try {
-        const response = await fetch(`http://localhost:8080/api/room/${roomId}/state`)
+        const response = await fetch(`${BACKEND_URL}/api/room/${roomId}/state`)
         if (response.ok) {
           const state = await response.json()
           setGameState(state)

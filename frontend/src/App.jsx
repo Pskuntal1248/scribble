@@ -6,6 +6,12 @@ import GameScreen from './components/GameScreen'
 import SockJS from 'sockjs-client'
 import Stomp from 'stompjs'
 
+// Get backend URL from environment variables or use localhost as fallback
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+const WS_URL = import.meta.env.VITE_WS_URL || BACKEND_URL
+
+console.log('🔗 Connecting to backend:', BACKEND_URL)
+
 function App() {
   const [screen, setScreen] = useState('login') // 'login', 'lobby', 'game'
   const [username, setUsername] = useState('')
@@ -15,7 +21,7 @@ function App() {
   const [connected, setConnected] = useState(false)
 
   const connectWebSocket = (callback) => {
-    const socket = new SockJS('http://localhost:8080/ws')
+    const socket = new SockJS(`${WS_URL}/ws`)
     const client = Stomp.over(socket)
     client.debug = null
 

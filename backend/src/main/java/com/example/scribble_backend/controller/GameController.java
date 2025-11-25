@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
@@ -29,6 +30,9 @@ public class GameController {
 
     @Autowired
     private GameService gameService;
+
+    @Value("${app.cors.allowed-origins}")
+    private String allowedOrigins;
 
     @MessageMapping("/join")
     @SuppressWarnings("unchecked")
@@ -185,7 +189,7 @@ public class GameController {
     }
     
     // REST endpoint to get current room state (fallback for WebSocket issues)
-    @CrossOrigin(origins = "http://localhost:3000")
+    @CrossOrigin(origins = "${app.cors.allowed-origins}")
     @GetMapping("/api/room/{roomId}/state")
     @ResponseBody
     public GameRoom getRoomState(@PathVariable String roomId) {
