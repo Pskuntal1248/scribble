@@ -146,6 +146,16 @@ public class GameController {
                 return;
             }
             
+            if (room.getPlayers().size() < 2) {
+                ChatMessage errorMsg = ChatMessage.builder()
+                        .type(ChatMessage.MessageType.SYSTEM)
+                        .sender("System")
+                        .content("Cannot start game: Minimum 2 players required!")
+                        .build();
+                messagingTemplate.convertAndSend("/topic/room/" + roomId + "/chat", errorMsg);
+                return;
+            }
+            
             room.updateActivity();
             gameService.startNewRound(room);
             messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", room);
