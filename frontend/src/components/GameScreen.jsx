@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
-// Get backend URL from environment variables
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
 
 export default function GameScreen({ stompClient, username, roomId, mySessionId, onBack }) {
@@ -26,6 +26,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
   const [chatInput, setChatInput] = useState('')
   const [showGameOver, setShowGameOver] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
+  const [showWordChoice, setShowWordChoice] = useState(false)
   
   // Drawing state
   const canvasRef = useRef(null)
@@ -52,19 +53,19 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
           }
         }
       } catch (error) {
-        console.error('Failed to fetch initial state:', error)
+        // Ignore errors
       }
     }
     
-    // Fetch after a short delay to allow WebSocket to connect
+    
     const timer = setTimeout(fetchInitialState, 500)
     return () => clearTimeout(timer)
   }, [roomId])
   
-  // Keyboard shortcuts
+  
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Only work if not typing in chat
+      
       if (document.activeElement.id === 'chat-input') return
       
       if (e.key === 'q' || e.key === 'Q') setCurrentTool('pen')
@@ -79,7 +80,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  // Global mouseup listener to stop drawing even when mouse released outside canvas
+ 
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       setIsDrawing(false)
@@ -89,7 +90,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
   }, [])
 
-  // Color palette
+  
   const colorPalette = [
     '#000000', '#FFFFFF', '#C0C0C0', '#808080',
     '#FF0000', '#800000', '#FFFF00', '#808000',
@@ -98,15 +99,15 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     '#FFA500', '#A52A2A', '#FF69B4', '#FFD700'
   ]
 
-  // Brush sizes (matching keyboard shortcuts 1-4)
-  const brushSizes = [8, 16, 24, 32]
+  
+  const brushSizes = [4, 8, 16, 24, 32]
 
-  // Auto-scroll chat
+ 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Initialize canvas
+  
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -128,7 +129,6 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     return () => window.removeEventListener('resize', initCanvas)
   }, [])
 
-  // WebSocket subscriptions
   useEffect(() => {
     if (!stompClient) return
 
@@ -151,6 +151,16 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
       const state = JSON.parse(msg.body)
       setGameState(state)
       setShowGameOver(state.gameOver || false)
+      
+      // Show word choice modal if I'm drawer and word hasn't been chosen
+      if (state.currentDrawerSessionId === mySessionId && 
+          !state.wordChosen && 
+          state.wordChoices && 
+          state.wordChoices.length > 0) {
+        setShowWordChoice(true)
+      } else {
+        setShowWordChoice(false)
+      }
       
       // Sync timer if game is running
       if ((state.isGameRunning || state.gameRunning) && state.roundTime !== undefined) {
@@ -304,17 +314,13 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
 
   // Start game
   const handleStartGame = () => {
-    console.log('🎮 Starting game in room:', roomId)
     if (!stompClient || !stompClient.connected) {
-      console.error('❌ WebSocket not connected!')
       alert('Connection lost. Please refresh and try again.')
       return
     }
     try {
       stompClient.send(`/app/start/${roomId}`, {}, '{}')
-      console.log('✅ Start game message sent to /app/start/' + roomId)
     } catch (error) {
-      console.error('❌ Error sending start game:', error)
       alert('Failed to start game. Please try again.')
     }
   }
@@ -391,10 +397,10 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ delay: 0.2 }}
-            className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-1.5"
+            className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1"
           >
             <span className="text-xs font-bold text-amber-700">ROOM</span>
-            <span className="font-mono text-lg font-bold text-amber-600">{roomId}</span>
+            <span className="font-mono text-base font-bold text-amber-600">{roomId}</span>
             <motion.button
               onClick={copyRoomCode}
               whileHover={{ scale: 1.1 }}
@@ -417,30 +423,30 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
               repeat: timer <= 10 ? Infinity : 0
             }}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-4 py-2 font-bold text-white shadow-md transition-colors",
+              "flex items-center gap-2 rounded-lg px-3 py-1.5 font-bold text-white shadow-md transition-colors",
               timer <= 10 ? "bg-red-500" : "bg-blue-500"
             )}
           >
-            <Clock size={20} />
-            <span className="text-xl">{timer}</span>
+            <Clock size={18} />
+            <span className="text-lg">{timer}</span>
           </motion.div>
         </div>
       </motion.header>
 
-      {/* Main Game Layout */}
-      <main className="flex flex-1 gap-6 overflow-hidden p-6">
+      {/* Main Game Layout - Optimized */}
+      <main className="flex flex-1 gap-4 overflow-hidden p-4">
         {/* Enhanced Left Panel - Players */}
         <motion.aside 
-          className="flex w-72 flex-col rounded-2xl bg-white shadow-sm ring-1 ring-gray-200"
+          className="flex w-64 flex-col rounded-xl bg-white shadow-sm ring-1 ring-gray-200"
           initial={{ x: -50, opacity: 0 }}
           animate={{ x: 0, opacity: 1 }}
           transition={{ delay: 0.2, duration: 0.4 }}
         >
-          <div className="flex items-center justify-center gap-2 border-b border-gray-100 p-4 font-bold text-gray-700">
-            <Users size={18} />
+          <div className="flex items-center justify-center gap-2 border-b border-gray-100 p-3 text-sm font-bold text-gray-700">
+            <Users size={16} />
             Players ({gameState?.players?.length || 0})
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-y-auto p-2">
             <AnimatePresence>
               {gameState?.players && gameState.players.length > 0 ? (
                 gameState.players.sort((a, b) => b.score - a.score).map((player, idx) => (
@@ -451,13 +457,13 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
                     exit={{ opacity: 0, x: 20 }}
                     transition={{ delay: idx * 0.05, duration: 0.3 }}
                     className={cn(
-                      "mb-2 flex items-center gap-3 rounded-xl p-3 transition-all",
+                      "mb-1.5 flex items-center gap-2 rounded-lg p-2 transition-all",
                       player.sessionId === mySessionId ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50",
                       player.sessionId === gameState.currentDrawerSessionId && "ring-2 ring-amber-400"
                     )}
                   >
                     <span className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
+                      "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
                       idx === 0 ? "bg-yellow-100 text-yellow-700" : 
                       idx === 1 ? "bg-gray-200 text-gray-700" : 
                       idx === 2 ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"
@@ -465,14 +471,14 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
                       {idx + 1}
                     </span>
                     <div className="flex-1 overflow-hidden">
-                      <div className="truncate font-bold text-gray-900">{player.username}</div>
+                      <div className="truncate text-sm font-bold text-gray-900">{player.username}</div>
                       <div className="text-xs font-medium text-gray-500">{player.score} pts</div>
                     </div>
                     {player.sessionId === gameState.currentDrawerSessionId && (
                       <motion.span 
                         animate={{ rotate: [0, 15, -15, 0] }}
                         transition={{ duration: 1, repeat: Infinity }}
-                        className="text-xl"
+                        className="text-lg"
                       >
                         ✏️
                       </motion.span>
@@ -535,58 +541,64 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
             )}
           </div>
 
-          {/* Enhanced Drawing Tools */}
+          {/* Enhanced Drawing Tools - Optimized */}
           <AnimatePresence>
             {isMyTurn && (
               <motion.div 
-                className="flex items-center gap-6 rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-200"
+                className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200"
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 exit={{ y: 50, opacity: 0 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold uppercase text-gray-400">Tools</label>
-                  <div className="flex gap-2">
-                    <motion.button
-                      onClick={() => setCurrentTool('pen')}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition-all",
-                        currentTool === 'pen' ? "bg-blue-500 text-white shadow-md shadow-blue-500/30" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      )}
-                    >
-                      <Pen size={16} /> Pen
-                    </motion.button>
-                    <motion.button
-                      onClick={() => setCurrentTool('eraser')}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg px-4 py-2 font-bold transition-all",
-                        currentTool === 'eraser' ? "bg-red-500 text-white shadow-md shadow-red-500/30" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                      )}
-                    >
-                      <Eraser size={16} /> Eraser
-                    </motion.button>
-                  </div>
+                {/* Tools Section */}
+                <div className="flex items-center gap-2">
+                  <motion.button
+                    onClick={() => setCurrentTool('pen')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                      currentTool === 'pen' ? "bg-blue-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                  >
+                    <Pen size={14} /> Pen
+                  </motion.button>
+                  <motion.button
+                    onClick={() => setCurrentTool('eraser')}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                      currentTool === 'eraser' ? "bg-red-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    )}
+                  >
+                    <Eraser size={14} /> Eraser
+                  </motion.button>
+                  <motion.button
+                    onClick={handleClearCanvas}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={14} /> Clear
+                  </motion.button>
                 </div>
 
-                <div className="h-10 w-px bg-gray-200" />
+                <div className="h-8 w-px bg-gray-200" />
 
-                <div className="flex flex-col gap-2 shrink-0">
-                  <label className="text-xs font-bold uppercase text-gray-400">Colors</label>
-                  <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5">
-                    {colorPalette.map((color, index) => (
+                {/* Colors Section - Compact Grid */}
+                <div className="flex-1 min-w-0">
+                  <div className="grid grid-cols-10 gap-1">
+                    {colorPalette.map((color) => (
                       <motion.button
                         key={color}
                         onClick={() => { setCurrentColor(color); setCurrentTool('pen'); }}
-                        whileHover={{ scale: 1.2 }}
+                        whileHover={{ scale: 1.15 }}
                         whileTap={{ scale: 0.9 }}
                         className={cn(
-                          "h-8 w-8 rounded-full border-2 transition-all",
-                          currentColor === color && currentTool === 'pen' ? "border-gray-900 scale-110" : "border-transparent hover:border-gray-300"
+                          "h-7 w-7 rounded-full border-2 transition-all",
+                          currentColor === color && currentTool === 'pen' ? "border-gray-900 scale-105" : "border-transparent hover:border-gray-300"
                         )}
                         style={{ backgroundColor: color }}
                       />
@@ -594,41 +606,27 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
                   </div>
                 </div>
 
-                <div className="h-10 w-px bg-gray-200" />
+                <div className="h-8 w-px bg-gray-200" />
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-bold uppercase text-gray-400">Size</label>
-                  <div className="flex items-center gap-2">
-                    {brushSizes.map((size) => (
-                      <motion.button
-                        key={size}
-                        onClick={() => setBrushSize(size)}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className={cn(
-                          "flex h-10 w-10 items-center justify-center rounded-lg transition-all",
-                          brushSize === size ? "bg-blue-100 ring-2 ring-blue-500" : "bg-gray-100 hover:bg-gray-200"
+                {/* Size Section - Compact */}
+                <div className="flex items-center gap-1.5">
+                  {brushSizes.map((size) => (
+                    <motion.button
+                      key={size}
+                      onClick={() => setBrushSize(size)}
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded-lg transition-all",
+                        brushSize === size ? "bg-blue-100 ring-2 ring-blue-500" : "bg-gray-100 hover:bg-gray-200"
                         )}
                       >
                         <div 
                           className="rounded-full bg-gray-900"
-                          style={{ width: size / 2, height: size / 2 }}
+                          style={{ width: size / 2.5, height: size / 2.5 }}
                         />
                       </motion.button>
                     ))}
-                  </div>
-                </div>
-
-                <div className="ml-auto">
-                  <motion.button 
-                    onClick={handleClearCanvas} 
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center gap-2 rounded-lg bg-red-100 px-4 py-2 font-bold text-red-600 hover:bg-red-200"
-                  >
-                    <Trash2 size={16} />
-                    Clear
-                  </motion.button>
                 </div>
               </motion.div>
             )}
@@ -646,8 +644,8 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
             <MessageSquare size={18} />
             Chat
           </div>
-          <div className="flex-1 overflow-y-auto bg-gray-50 p-4">
-            <div className="flex flex-col gap-2">
+          <div className="flex-1 overflow-y-auto bg-gray-50 p-3">
+            <div className="flex flex-col gap-1.5">
               <AnimatePresence initial={false}>
                 {messages.map((msg, idx) => (
                   <motion.div 
@@ -655,7 +653,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
                     initial={{ opacity: 0, x: 20, scale: 0.9 }}
                     animate={{ opacity: 1, x: 0, scale: 1 }}
                     className={cn(
-                      "rounded-lg px-3 py-2 text-sm shadow-sm",
+                      "rounded-lg px-2.5 py-1.5 text-xs shadow-sm",
                       msg.type === 'SYSTEM' ? "bg-blue-50 text-blue-800 border border-blue-100" : 
                       msg.type === 'GUESS_CORRECT' ? "bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold" : 
                       "bg-white text-gray-800 border border-gray-100"
@@ -669,7 +667,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
               <div ref={messagesEndRef} />
             </div>
           </div>
-          <div className="border-t border-gray-100 p-4">
+          <div className="border-t border-gray-100 p-3">
             <input
               id="chat-input"
               type="text"
@@ -687,63 +685,115 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
         </motion.aside>
       </main>
 
-      {/* Enhanced Game Over Modal */}
+      {/* Word Choice Modal for Drawer */}
       <AnimatePresence>
-        {showGameOver && (
+        {showWordChoice && gameState?.wordChoices && (
           <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div 
-              className="w-full max-w-lg rounded-3xl bg-white p-8 shadow-2xl"
-              initial={{ scale: 0.8, opacity: 0, y: 50 }}
+              className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0, y: 50 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
             >
-              <motion.h1 
-                className="mb-8 text-center text-4xl font-black text-gray-900"
-                animate={{ rotate: [0, -5, 5, -5, 5, 0] }}
-                transition={{ duration: 0.5, delay: 0.2 }}
-              >
-                🎉 Game Over!
-              </motion.h1>
-              <div className="mb-8">
-                <h2 className="mb-4 flex items-center justify-center gap-2 text-lg font-bold uppercase tracking-wider text-gray-500">
-                  <Trophy size={20} />
+              <div className="mb-4 text-center">
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">
+                  Choose Your Word
+                </h2>
+                <p className="text-sm text-gray-500">
+                  Select a word and start drawing
+                </p>
+              </div>
+              <div className="space-y-2">
+                {gameState.wordChoices.map((word, idx) => (
+                  <motion.button
+                    key={idx}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    whileHover={{ scale: 1.02, x: 4 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => {
+                      stompClient.send(`/app/chooseWord/${roomId}`, {}, JSON.stringify({ word }))
+                      setShowWordChoice(false)
+                    }}
+                    className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-lg font-semibold text-white shadow-md transition-all hover:shadow-lg"
+                  >
+                    {word}
+                  </motion.button>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Enhanced Game Over Modal */}
+      <AnimatePresence>
+        {showGameOver && (
+          <motion.div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div 
+              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            >
+              <h1 className="mb-4 text-center text-2xl font-bold text-gray-900">
+                Game Over
+              </h1>
+              <div className="mb-4">
+                <h2 className="mb-3 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  <Trophy size={16} />
                   Final Scores
                 </h2>
-                <div className="space-y-3">
+                <div className="space-y-1.5">
                   {gameState?.players?.sort((a, b) => b.score - a.score).map((player, idx) => (
                     <motion.div 
                       key={player.sessionId} 
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.3 + idx * 0.1, duration: 0.4 }}
-                      whileHover={{ scale: 1.02 }}
+                      transition={{ delay: 0.2 + idx * 0.08, duration: 0.3 }}
+                      whileHover={{ x: 4 }}
                       className={cn(
-                        "flex items-center gap-4 rounded-xl p-4 transition-all",
-                        idx === 0 ? "bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 shadow-sm" : "bg-gray-50 border border-gray-100"
+                        "flex items-center gap-2 rounded-lg p-3 transition-all",
+                        idx === 0 ? "bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200" : 
+                        idx === 1 ? "bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200" :
+                        idx === 2 ? "bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200" :
+                        "bg-gray-50 border border-gray-100"
                       )}
                     >
-                      <span className="text-2xl">
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                      <span className={cn(
+                        "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
+                        idx === 0 ? "bg-amber-500 text-white" :
+                        idx === 1 ? "bg-gray-400 text-white" :
+                        idx === 2 ? "bg-orange-400 text-white" :
+                        "bg-gray-300 text-gray-700"
+                      )}>
+                        {idx + 1}
                       </span>
-                      <span className="flex-1 font-bold text-gray-900">{player.username}</span>
-                      <span className="font-bold text-indigo-600">{player.score} pts</span>
+                      <span className="flex-1 text-sm font-semibold text-gray-900">{player.username}</span>
+                      <span className="font-bold text-indigo-600">{player.score}</span>
                     </motion.div>
                   ))}
                 </div>
               </div>
               <motion.button 
                 onClick={onBack}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-4 font-bold text-white shadow-lg transition-all hover:bg-gray-800"
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-gray-800"
               >
-                <ArrowLeft size={20} />
+                <ArrowLeft size={16} />
                 Back to Menu
               </motion.button>
             </motion.div>

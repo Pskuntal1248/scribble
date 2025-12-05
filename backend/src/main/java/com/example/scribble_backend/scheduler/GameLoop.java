@@ -22,18 +22,13 @@ public class GameLoop {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
-    // Clean up inactive rooms every 5 minutes
-    @Scheduled(fixedRate = 300000) // 5 minutes
+    
+    @Scheduled(fixedRate = 300000) 
     public void cleanupInactiveRooms() {
-        // Public rooms: inactive for 15 minutes
-        // Private rooms: inactive for 60 minutes (1 hour)
         long publicThreshold = 15 * 60 * 1000;  // 15 minutes
         long privateThreshold = 60 * 60 * 1000; // 60 minutes
         
-        int removed = gameService.cleanupInactiveRooms(publicThreshold, privateThreshold);
-        if (removed > 0) {
-            System.out.println(">>> Cleaned up " + removed + " inactive room(s)");
-        }
+        gameService.cleanupInactiveRooms(publicThreshold, privateThreshold);
     }
     
     @Scheduled(fixedRate = 1000)
@@ -44,23 +39,22 @@ public class GameLoop {
                
                 room.setRoundTime(room.getRoundTime() - 1);
 
-             
-                if (room.getRoundTime() == 45 || room.getRoundTime() == 30 || room.getRoundTime() == 15) {
-                    revealRandomLetter(room);
+                // Dynamic hint system - check if current time matches any hint time
+                if (room.getHintTimes() != null && !room.getHintTimes().isEmpty()) {
+                    int currentTime = room.getRoundTime();
                     
-                    String hintWord = room.getHintWord();
-                    System.out.println(">>> HINT REVEALED at " + room.getRoundTime() + "s: " + hintWord);
-                    
-                  
-                    messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
+                    // Check if we should reveal a hint at this time
+                    if (room.getHintTimes().contains(currentTime) && room.getHintsRevealed() < room.getHintTimes().size()) {
+                        revealRandomLetter(room);
+                        room.setHintsRevealed(room.getHintsRevealed() + 1);
+                        
+                        messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
+                    }
                 }
 
-               
                 messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/time", room.getRoundTime());
 
-              
                 if (room.allPlayersGuessed()) {
-                    System.out.println(">>> All players guessed! Ending round early.");
                     endRoundAndStartNext(room);
                 }
                 
@@ -94,26 +88,22 @@ public class GameLoop {
             }
         }
 
-        // If there are unrevealed positions, reveal one randomly
         if (!unrevealedPositions.isEmpty()) {
             Random rand = new Random();
             int randomIndex = unrevealedPositions.get(rand.nextInt(unrevealedPositions.size()));
             room.getRevealedIndices().add(randomIndex);
-            System.out.println(">>> Letter revealed at position " + randomIndex + ": '" + word.charAt(randomIndex) + "'");
-        } else {
-            System.out.println(">>> All letters already revealed!");
         }
     }
     
     private void endRoundAndStartNext(GameRoom room) {
         String oldWord = room.getCurrentWord();
         
-        // Send clear canvas message BEFORE starting next round
+     
         com.example.scribble_backend.model.DrawMessage clearMsg = new com.example.scribble_backend.model.DrawMessage();
         clearMsg.setType("CLEAR");
         messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/draw", clearMsg);
         
-        // Show what the word was (without scores - they're in the scoreboard)
+    
         ChatMessage wordRevealMsg = ChatMessage.builder()
                 .type(ChatMessage.MessageType.SYSTEM)
                 .sender("System")
@@ -121,10 +111,10 @@ public class GameLoop {
                 .build();
         messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", wordRevealMsg);
         
-        // Small delay to let players see the word reveal
+    
         try { Thread.sleep(500); } catch (InterruptedException e) { }
         
-        // Start new round (or end game)
+     
         gameService.startNewRound(room);
         
        

@@ -48,8 +48,6 @@ public class GameController {
             ipAddress = (String) headerAccessor.getSessionAttributes().get("IP_ADDRESS");
         }
 
-        System.out.println(">>> REQUEST: " + username + " (" + sessionId + ") from IP " + ipAddress + " wants to " + action + " room " + roomIdRequested);
-
         GameRoom room;
         if ("create".equals(action)) {
             // Parse config from payload
@@ -74,15 +72,7 @@ public class GameController {
                     @SuppressWarnings("unchecked")
                     List<String> customWordsList = (List<String>) customWordsObj;
                     config.setCustomWords(customWordsList);
-                    System.out.println(">>> Custom words provided: " + customWordsList.size() + " words");
                 }
-                
-                System.out.println(">>> Creating room with config: isPrivate=" + config.isPrivate() + 
-                                   ", drawingTime=" + config.getDrawingTime() + 
-                                   ", rounds=" + config.getRounds() + 
-                                   ", maxPlayers=" + config.getMaxPlayers() +
-                                   ", playersPerIP=" + config.getPlayersPerIpLimit() +
-                                   ", scoringMode=" + config.getScoringMode());
             }
             
             room = gameService.createRoom(roomIdRequested, username, sessionId, config, ipAddress);
@@ -91,9 +81,6 @@ public class GameController {
         }
 
         if (room != null) {
-            System.out.println(">>> Player joined successfully. Room has " + room.getPlayers().size() + " players");
-            
-            // Send join message
             ChatMessage joinMsg = ChatMessage.builder()
                     .type(ChatMessage.MessageType.JOIN)
                     .content(username + " joined!")
@@ -102,19 +89,13 @@ public class GameController {
                     .build();
             messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", joinMsg);
             
-            // Broadcast current state (critical for late joiners)
             messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
-            System.out.println(">>> State sent: gameRunning=" + room.isGameRunning() + ", drawer=" + room.getCurrentDrawerSessionId());
 
-            // Sync drawing history for late joiners
             if ("join".equals(action) && !room.getDrawHistory().isEmpty()) {
-                System.out.println(">>> Syncing " + room.getDrawHistory().size() + " strokes to late joiner");
                 for (DrawMessage stroke : room.getDrawHistory()) {
                     messagingTemplate.convertAndSendToUser(sessionId, "/queue/draw", stroke);
                 }
             }
-        } else {
-            System.out.println(">>> ERROR: Room is null after join attempt!");
         }
     }
 
@@ -161,39 +142,49 @@ public class GameController {
     public synchronized void startGame(@DestinationVariable String roomId) {
         GameRoom room = gameService.getRoom(roomId);
         if(room != null) {
-            // Prevent multiple starts - check if game is already running
             if (room.isGameRunning()) {
-                System.out.println(">>> Game already running in room: " + roomId);
                 return;
             }
             
-            room.updateActivity(); // Track activity
-            System.out.println(">>> START GAME REQUEST for room: " + roomId);
-            
-            // Start new round
+            room.updateActivity();
             gameService.startNewRound(room);
-            
-            // Broadcast state to all players
             messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", room);
             
-            // Send game started message
             ChatMessage startMsg = ChatMessage.builder()
                     .type(ChatMessage.MessageType.SYSTEM)
                     .sender("System")
-                    .content("Game Started! Draw and Guess!")
+                    .content("Game Started! Drawer is choosing a word...")
                     .build();
             messagingTemplate.convertAndSend("/topic/room/" + roomId + "/chat", startMsg);
-            
-            System.out.println(">>> Game state broadcasted. gameRunning=" + room.isGameRunning() + ", hint=" + room.getHintWord());
         }
     }
     
-    // REST endpoint to get current room state (fallback for WebSocket issues)
+    @MessageMapping("/chooseWord/{roomId}")
+    public synchronized void chooseWord(@DestinationVariable String roomId, @Payload Map<String, Object> payload, SimpMessageHeaderAccessor headerAccessor) {
+        String chosenWord = (String) payload.get("word");
+        String sessionId = headerAccessor.getSessionId();
+        
+        GameRoom room = gameService.getRoom(roomId);
+        if (room != null) {
+            boolean success = gameService.chooseWord(roomId, sessionId, chosenWord);
+            
+            if (success) {
+                messagingTemplate.convertAndSend("/topic/room/" + roomId + "/state", room);
+                
+                ChatMessage msg = ChatMessage.builder()
+                        .type(ChatMessage.MessageType.SYSTEM)
+                        .sender("System")
+                        .content("Word chosen! Start drawing now!")
+                        .build();
+                messagingTemplate.convertAndSend("/topic/room/" + roomId + "/chat", msg);
+            }
+        }
+    }
+    
     @CrossOrigin(origins = "${app.cors.allowed-origins}")
     @GetMapping("/api/room/{roomId}/state")
     @ResponseBody
     public GameRoom getRoomState(@PathVariable String roomId) {
-        System.out.println(">>> REST API: Getting state for room " + roomId);
         return gameService.getRoom(roomId);
     }
 }

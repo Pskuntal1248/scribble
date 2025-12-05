@@ -27,28 +27,17 @@ public class WebSocketEventListener {
         String sessionId = headerAccessor.getSessionId();
         
         if (sessionId != null) {
-            System.out.println(">>> WebSocket DISCONNECT: sessionId=" + sessionId);
-            
-            // Find the room and player
             GameRoom room = gameService.findRoomBySessionId(sessionId);
             if (room != null) {
                 Player disconnectedPlayer = room.getPlayerBySessionId(sessionId);
                 String playerName = disconnectedPlayer != null ? disconnectedPlayer.getUsername() : "Unknown";
                 
-                System.out.println(">>> Player '" + playerName + "' disconnected from room " + room.getRoomId());
-                
-              
                 boolean removed = gameService.removePlayerFromRoom(room.getRoomId(), sessionId);
                 
                 if (removed) {
-                  
                     if (room.getPlayers().isEmpty()) {
-                        System.out.println(">>> Room " + room.getRoomId() + " is now EMPTY. Removing from server.");
                         gameService.removeRoom(room.getRoomId());
                     } else {
-                        System.out.println(">>> Room " + room.getRoomId() + " now has " + room.getPlayers().size() + " player(s)");
-                        
-                        // Notify other players
                         ChatMessage leaveMsg = ChatMessage.builder()
                                 .type(ChatMessage.MessageType.SYSTEM)
                                 .sender("System")
@@ -56,15 +45,10 @@ public class WebSocketEventListener {
                                 .build();
                         messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", leaveMsg);
                         
-                        // Broadcast updated state
                         messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
                         
-                        // If game was running and drawer left, end the round
                         if (room.isGameRunning() && sessionId.equals(room.getCurrentDrawerSessionId())) {
-                            System.out.println(">>> Drawer left during game! Ending current turn...");
                             gameService.handleDrawerDisconnect(room);
-                            
-                            // Broadcast new game state
                             messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
                         }
                     }

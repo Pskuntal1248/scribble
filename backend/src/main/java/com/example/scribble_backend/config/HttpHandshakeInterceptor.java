@@ -31,7 +31,6 @@ public class HttpHandshakeInterceptor implements HandshakeInterceptor {
             
             // Store IP in session attributes
             attributes.put("IP_ADDRESS", ipAddress);
-            System.out.println(">>> WebSocket handshake from IP: " + ipAddress);
         }
         
         return true;

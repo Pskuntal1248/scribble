@@ -4,7 +4,7 @@ import lombok.Data;
 
 @Data
 public class DrawMessage {
-    private String type; // "DRAW", "CLEAR", "UNDO"
+    private String type; 
     private double prevX;
     private double prevY;
     private double currX;

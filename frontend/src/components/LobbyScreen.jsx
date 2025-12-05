@@ -20,8 +20,7 @@ import { cn } from '../lib/utils'
 export default function LobbyScreen({ stompClient, username, mySessionId, onBack, onJoinRoom }) {
   const [lobbies, setLobbies] = useState([])
   const [lobbyCode, setLobbyCode] = useState('')
-  
-  // Lobby configuration
+ 
   const [language, setLanguage] = useState('English')
   const [scoring, setScoring] = useState('Chill')
   const [drawTime, setDrawTime] = useState(120)
@@ -40,15 +39,13 @@ export default function LobbyScreen({ stompClient, username, mySessionId, onBack
       .then(data => {
         setLobbies(data)
       })
-      .catch(err => {
-        console.error('Failed to load lobbies:', err)
-      })
+      .catch(() => {})
   }
 
   const createRoom = (isPrivate) => {
     const roomCode = Math.floor(100000 + Math.random() * 900000).toString()
     
-    // Send complete configuration including isPrivate flag
+    
     stompClient.send('/app/join', {}, JSON.stringify({
       username,
       roomId: roomCode,
@@ -79,7 +76,6 @@ export default function LobbyScreen({ stompClient, username, mySessionId, onBack
   }
 
   const joinRoom = (roomCode) => {
-    // Don't subscribe here - GameScreen will handle subscriptions
     stompClient.send('/app/join', {}, JSON.stringify({
       username,
       roomId: roomCode,

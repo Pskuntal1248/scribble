@@ -10,8 +10,6 @@ import Stomp from 'stompjs'
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
 const WS_URL = import.meta.env.VITE_WS_URL || BACKEND_URL
 
-console.log('🔗 Connecting to backend:', BACKEND_URL)
-
 function App() {
   const [screen, setScreen] = useState('login') // 'login', 'lobby', 'game'
   const [username, setUsername] = useState('')
@@ -26,19 +24,15 @@ function App() {
     client.debug = null
 
     client.connect({}, (frame) => {
-      console.log('Connected:', frame)
-      
       const url = socket._transport.url
       const parts = url.split('/')
       const sessionId = parts[parts.length - 2]
-      console.log('>>> Session ID extracted:', sessionId)
       setMySessionId(sessionId)
       setConnected(true)
       setStompClient(client)
       
       if (callback) callback(client, sessionId)
-    }, (error) => {
-      console.error('Connection error:', error)
+    }, () => {
       alert('Failed to connect to server')
     })
   }

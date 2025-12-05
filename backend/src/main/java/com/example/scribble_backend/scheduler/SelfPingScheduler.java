@@ -13,7 +13,7 @@ public class SelfPingScheduler {
     @Value("${app.self-ping.url:http://localhost:8080}")
     private String appUrl;
 
-    @Scheduled(fixedRate = 600000) // every 10 minutes (600,000 milliseconds)
+    @Scheduled(fixedRate = 600000) 
     public void selfPing() {
         try {
             URL url = new URL(appUrl + "/ping");
@@ -22,12 +22,10 @@ public class SelfPingScheduler {
             conn.setConnectTimeout(5000);
             conn.setReadTimeout(5000);
             
-            int responseCode = conn.getResponseCode();
+            conn.getResponseCode();
             conn.getInputStream().close();
-            
-            System.out.println(">>> Self-ping successful: " + responseCode + " from " + appUrl);
         } catch (Exception e) {
-            System.out.println(">>> Self-ping failed: " + e.getMessage());
+            // Ignore ping failures
         }
     }
 }
