@@ -24,12 +24,9 @@ public class GameService {
     private final Map<String, GameRoom> rooms = new ConcurrentHashMap<>();
     private final Map<String, List<String>> wordListsByLanguage = new ConcurrentHashMap<>();
     
-    // Fallback words if files can't be loaded
     private final List<String> defaultWordList = Arrays.asList("apple", "banana", "house", "car", "tree", "dog", "cat", "computer", "java", "spring");
     
     public GameService() {
-        // Load word lists on startup
-        // Merge English (US) and English (GB) into one combined English list
         List<String> englishWords = new ArrayList<>();
         englishWords.addAll(loadWordsFromFile("en_us.txt"));
         englishWords.addAll(loadWordsFromFile("en_gb.txt"));
@@ -106,17 +103,12 @@ public class GameService {
     public GameRoom joinRoom(String roomId, String playerName, String sessionId, String ipAddress) {
         GameRoom room = rooms.get(roomId);
         if (room != null) {
-            if (room.getPlayers().size() >= room.getMaxPlayers()) {
+            if (room.isGameOver()) {
                 return null;
             }
             
-            if (ipAddress != null && room.getPlayersPerIpLimit() > 0) {
-                long playersFromSameIp = room.getPlayers().stream()
-                        .filter(p -> ipAddress.equals(p.getIpAddress()))
-                        .count();
-                if (playersFromSameIp >= room.getPlayersPerIpLimit()) {
-                    return null;
-                }
+            if (room.getPlayers().size() >= room.getMaxPlayers()) {
+                return null;
             }
             
             boolean playerExists = room.getPlayers().stream()
@@ -142,7 +134,7 @@ public class GameService {
 
     public Collection<GameRoom> getAllPublicRooms() {
         return rooms.values().stream()
-                .filter(room -> !room.isPrivate() && !room.isGameRunning())
+                .filter(room -> !room.isPrivate() && !room.isGameRunning() && !room.isGameOver() && !room.getPlayers().isEmpty())
                 .toList();
     }
     
@@ -218,9 +210,15 @@ public class GameService {
 
         room.setDrawerIndex(room.getDrawerIndex() + 1);
 
+        // Handle case where drawerIndex is out of bounds (e.g. player left or joined)
         if (room.getDrawerIndex() >= players.size()) {
             room.setDrawerIndex(0);
             room.setCurrentRound(room.getCurrentRound() + 1);
+        }
+        
+        // Double check index validity after reset
+        if (room.getDrawerIndex() >= players.size()) {
+             room.setDrawerIndex(0);
         }
 
         if (room.isGameOver()) {
@@ -230,7 +228,7 @@ public class GameService {
 
         room.resetRoundData();
         room.setGameRunning(true);
-        room.setRoundTime(room.getDrawingTime());
+        room.setRoundTime(15); // 15 seconds to choose a word
 
         int numChoices = room.getCustomWordsPerTurn();
         List<String> choices = new ArrayList<>();
@@ -269,6 +267,10 @@ public class GameService {
     public boolean processGuess(String roomId, String guess, String senderSessionId) {
         GameRoom room = rooms.get(roomId);
         if (room == null || !room.isGameRunning()) return false;
+        
+        // Ensure player is actually in the room (prevents ghost players)
+        if (room.getPlayerBySessionId(senderSessionId) == null) return false;
+        
         if (senderSessionId.equals(room.getCurrentDrawerSessionId())) return false; // Drawer cannot guess
         if (room.getPlayersWhoGuessedCorrectly().contains(senderSessionId)) return false; // Already guessed
 
@@ -323,6 +325,7 @@ public class GameService {
         
         room.setCurrentWord(chosenWord);
         room.setWordChosen(true);
+        room.setRoundTime(room.getDrawingTime()); // Start the drawing timer
         room.getWordChoices().clear();
         
         return true;

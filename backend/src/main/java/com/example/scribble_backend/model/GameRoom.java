@@ -4,19 +4,20 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import lombok.Data;
 
 @Data
 public class GameRoom {
     private String roomId;
-    private List<Player> players = new ArrayList<>();
+    private List<Player> players = new CopyOnWriteArrayList<>();
     
     private String language = "English";
     private String scoringMode = "Chill";
     private int drawingTime = 120;
     private int maxPlayers = 24;
-    private int playersPerIpLimit = 2;
+    private int playersPerIpLimit = 999;
     private int customWordsPerTurn = 3;
     private List<String> customWords = new ArrayList<>();
     private boolean isPrivate = false;

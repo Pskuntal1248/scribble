@@ -25,7 +25,8 @@
     "sockjs-client": "^1.6.1",
     "stompjs": "^2.3.3",
     "tailwind-merge": "^3.4.0",
-    "three": "^0.167.1"
+    "three": "^0.167.1",
+    "vite-plugin-pwa": "^1.2.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

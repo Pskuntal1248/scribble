@@ -37,7 +37,7 @@ export default function LoginScreen({ username, setUsername, onPlayClick }) {
         transition={{ duration: 0.5, ease: "easeOut" }}
       >
         <Card className="w-full shadow-2xl border-none bg-white/80" isBlurred>
-            <CardHeader className="flex flex-col gap-2 items-center justify-center pt-8 pb-4">
+            <CardHeader className="flex flex-col gap-2 items-center justify-center pt-6 pb-2">
                 <motion.div
                     initial={{ y: -20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -45,9 +45,9 @@ export default function LoginScreen({ username, setUsername, onPlayClick }) {
                     className="text-center flex flex-col items-center"
                 >
                     <div className="mb-0">
-                        <img src={logo} alt="Drowly Logo" className="w-72 h-auto object-contain drop-shadow-lg" />
+                        <img src={logo} alt="Drowly Logo" className="w-48 h-auto object-contain drop-shadow-lg" />
                     </div>
-                    <p className="text-default-500 font-medium -mt-4">
+                    <p className="text-default-500 font-medium -mt-2 text-sm">
                         Draw. Guess. Win.
                     </p>
                 </motion.div>
@@ -55,15 +55,15 @@ export default function LoginScreen({ username, setUsername, onPlayClick }) {
             
             <Divider className="my-2" />
 
-            <CardBody className="gap-6 p-8">
+            <CardBody className="gap-4 p-6">
                 <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
                     transition={{ delay: 0.3, duration: 0.5 }}
-                    className="flex flex-col gap-6"
+                    className="flex flex-col gap-4"
                 >
                     <Input
-                        size="lg"
+                        size="md"
                         variant="bordered"
                         label="Nickname"
                         placeholder="Enter your artist name"
@@ -74,7 +74,7 @@ export default function LoginScreen({ username, setUsername, onPlayClick }) {
                         classNames={{
                             inputWrapper: "bg-default-100/50 hover:bg-default-200/50 transition-colors border-default-200",
                             label: "text-default-600",
-                            input: "text-lg font-medium text-default-900"
+                            input: "text-base font-medium text-default-900"
                         }}
                         startContent={
                             <div className="pointer-events-none flex items-center">
@@ -99,10 +99,10 @@ export default function LoginScreen({ username, setUsername, onPlayClick }) {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.6, duration: 0.5 }}
-                    className="mt-2 flex flex-col items-center gap-3 rounded-xl bg-default-50 p-4 border border-default-100"
+                    className="mt-1 flex flex-col items-center gap-2 rounded-xl bg-default-50 p-3 border border-default-100"
                 >
-                    <Chip color="warning" variant="flat" size="sm" className="uppercase font-bold tracking-wider">Pro Tips</Chip>
-                    <div className="flex flex-wrap justify-center gap-3 text-xs text-default-500">
+                    <Chip color="warning" variant="flat" size="sm" className="uppercase font-bold tracking-wider text-[10px]">Pro Tips</Chip>
+                    <div className="flex flex-wrap justify-center gap-3 text-[10px] text-default-500">
                         <div className="flex items-center gap-1">
                             <span>Draw</span>
                             <Kbd keys={["q"]}>Q</Kbd>

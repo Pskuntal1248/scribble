@@ -11,15 +11,14 @@ import {
   Play,
   Trophy,
   Users,
-  MessageSquare
+  MessageSquare,
+  Palette
 } from 'lucide-react'
 import { cn } from '../lib/utils'
-
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
 
 export default function GameScreen({ stompClient, username, roomId, mySessionId, onBack }) {
-  // Core game state
   const [gameState, setGameState] = useState(null)
   const [timer, setTimer] = useState(60)
   const [messages, setMessages] = useState([])
@@ -28,161 +27,18 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
   const [copiedCode, setCopiedCode] = useState(false)
   const [showWordChoice, setShowWordChoice] = useState(false)
   
-  // Drawing state
+  const [activeTab, setActiveTab] = useState('canvas')
   const canvasRef = useRef(null)
+  const drawHistory = useRef([])
   const messagesEndRef = useRef(null)
   const [isDrawing, setIsDrawing] = useState(false)
-  const [currentTool, setCurrentTool] = useState('pen') // 'pen', 'eraser'
+  const [currentTool, setCurrentTool] = useState('pen')
   const [currentColor, setCurrentColor] = useState('#000000')
   const [brushSize, setBrushSize] = useState(16)
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
 
-  // Check if I'm the drawer
   const isMyTurn = gameState?.currentDrawerSessionId === mySessionId
-  
-  // Fetch initial game state on mount (fallback if WebSocket is slow)
-  useEffect(() => {
-    const fetchInitialState = async () => {
-      try {
-        const response = await fetch(`${BACKEND_URL}/api/room/${roomId}/state`)
-        if (response.ok) {
-          const state = await response.json()
-          setGameState(state)
-          if ((state.isGameRunning || state.gameRunning) && state.roundTime) {
-            setTimer(state.roundTime)
-          }
-        }
-      } catch (error) {
-        // Ignore errors
-      }
-    }
-    
-    
-    const timer = setTimeout(fetchInitialState, 500)
-    return () => clearTimeout(timer)
-  }, [roomId])
-  
-  
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      
-      if (document.activeElement.id === 'chat-input') return
-      
-      if (e.key === 'q' || e.key === 'Q') setCurrentTool('pen')
-      else if (e.key === 'e' || e.key === 'E') setCurrentTool('eraser')
-      else if (e.key === '1') setBrushSize(8)
-      else if (e.key === '2') setBrushSize(16)
-      else if (e.key === '3') setBrushSize(24)
-      else if (e.key === '4') setBrushSize(32)
-    }
-    
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
 
- 
-  useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      setIsDrawing(false)
-    }
-    
-    window.addEventListener('mouseup', handleGlobalMouseUp)
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
-  }, [])
-
-  
-  const colorPalette = [
-    '#000000', '#FFFFFF', '#C0C0C0', '#808080',
-    '#FF0000', '#800000', '#FFFF00', '#808000',
-    '#00FF00', '#008000', '#00FFFF', '#008080',
-    '#0000FF', '#000080', '#FF00FF', '#800080',
-    '#FFA500', '#A52A2A', '#FF69B4', '#FFD700'
-  ]
-
-  
-  const brushSizes = [4, 8, 16, 24, 32]
-
- 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const initCanvas = () => {
-      const container = canvas.parentElement
-      const { width, height } = container.getBoundingClientRect()
-      
-      canvas.width = width
-      canvas.height = height
-      
-      const ctx = canvas.getContext('2d')
-      ctx.fillStyle = '#FFFFFF'
-      ctx.fillRect(0, 0, width, height)
-    }
-
-    initCanvas()
-    window.addEventListener('resize', initCanvas)
-    return () => window.removeEventListener('resize', initCanvas)
-  }, [])
-
-  useEffect(() => {
-    if (!stompClient) return
-
-    const subs = []
-
-    // Subscribe to draw events
-    subs.push(stompClient.subscribe(`/topic/room/${roomId}/draw`, (msg) => {
-      const data = JSON.parse(msg.body)
-      renderDrawing(data)
-    }))
-
-    // Subscribe to chat
-    subs.push(stompClient.subscribe(`/topic/room/${roomId}/chat`, (msg) => {
-      const chatMsg = JSON.parse(msg.body)
-      setMessages(prev => [...prev, chatMsg])
-    }))
-
-    // Subscribe to game state
-    subs.push(stompClient.subscribe(`/topic/room/${roomId}/state`, (msg) => {
-      const state = JSON.parse(msg.body)
-      setGameState(state)
-      setShowGameOver(state.gameOver || false)
-      
-      // Show word choice modal if I'm drawer and word hasn't been chosen
-      if (state.currentDrawerSessionId === mySessionId && 
-          !state.wordChosen && 
-          state.wordChoices && 
-          state.wordChoices.length > 0) {
-        setShowWordChoice(true)
-      } else {
-        setShowWordChoice(false)
-      }
-      
-      // Sync timer if game is running
-      if ((state.isGameRunning || state.gameRunning) && state.roundTime !== undefined) {
-        setTimer(state.roundTime)
-      }
-    }))
-
-    // Subscribe to timer
-    subs.push(stompClient.subscribe(`/topic/room/${roomId}/time`, (msg) => {
-      setTimer(parseInt(msg.body))
-    }))
-
-    // Subscribe to personal draw queue
-    subs.push(stompClient.subscribe('/user/queue/draw', (msg) => {
-      const data = JSON.parse(msg.body)
-      renderDrawing(data)
-    }))
-
-    return () => subs.forEach(s => s.unsubscribe())
-  }, [stompClient, roomId])
-
-  // Render drawing on canvas
   const renderDrawing = (data) => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -209,47 +65,256 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     ctx.lineJoin = 'round'
     ctx.stroke()
   }
+  
+  useEffect(() => {
+    const fetchInitialState = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/room/${roomId}/state`)
+        if (response.ok) {
+          const state = await response.json()
+          setGameState(state)
+          
+          if (state.drawHistory && state.drawHistory.length > 0 && drawHistory.current.length === 0) {
+            drawHistory.current = state.drawHistory
+            state.drawHistory.forEach(data => renderDrawing(data))
+          }
 
-  // Mouse down - start drawing
-  const handleMouseDown = (e) => {
-    if (!isMyTurn) return
+          if ((state.isGameRunning || state.gameRunning) && state.roundTime) {
+            setTimer(state.roundTime)
+          }
+        }
+      } catch (error) {
 
+      }
+    }
+    
+    const timer = setTimeout(fetchInitialState, 500)
+    return () => clearTimeout(timer)
+  }, [roomId])
+  
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (document.activeElement.id === 'chat-input') return
+      
+      if (e.key === 'q' || e.key === 'Q') setCurrentTool('pen')
+      else if (e.key === 'e' || e.key === 'E') setCurrentTool('eraser')
+      else if (e.key === '1') setBrushSize(8)
+      else if (e.key === '2') setBrushSize(16)
+      else if (e.key === '3') setBrushSize(24)
+      else if (e.key === '4') setBrushSize(32)
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      setIsDrawing(false)
+    }
+    
+    window.addEventListener('mouseup', handleGlobalMouseUp)
+    window.addEventListener('touchend', handleGlobalMouseUp)
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp)
+      window.removeEventListener('touchend', handleGlobalMouseUp)
+    }
+  }, [])
+
+  const colorPalette = [
+    '#FFFFFF', '#000000', // White, Black
+    '#C0C0C0', '#808080', // Light Gray, Gray
+    '#FF0000', '#800000', // Red, Maroon
+    '#FFA500', '#FF8C00', // Orange, Dark Orange
+    '#FFFF00', '#DAA520', // Yellow, GoldenRod
+    '#00FF00', '#008000', // Lime, Green
+    '#87CEEB', '#0000FF', // Sky Blue, Blue
+    '#4169E1', '#000080', // Royal Blue, Navy
+    '#EE82EE', '#4B0082', // Violet, Indigo
+    '#FFC0CB', '#FF00FF', // Pink, Magenta
+    '#F5F5DC', '#8B4513', // Beige, SaddleBrown
+    '#00FFFF', '#008080', // Cyan, Teal
+  ]
+
+  const brushSizes = [4, 8, 16, 24, 32]
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const handleResize = () => {
+      const container = canvas.parentElement
+      const { width, height } = container.getBoundingClientRect()
+      
+      if (width === 0 || height === 0) return
+      if (canvas.width === width && canvas.height === height) return
+
+      canvas.width = width
+      canvas.height = height
+      
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, width, height)
+      
+      drawHistory.current.forEach(data => renderDrawing(data))
+    }
+
+    const init = () => {
+      const container = canvas.parentElement
+      const { width, height } = container.getBoundingClientRect()
+      
+      if (width === 0 || height === 0) return
+      
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#FFFFFF'
+      ctx.fillRect(0, 0, width, height)
+    }
+    
+    init()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const handleTouchStart = (e) => {
+      if (e.target === canvas) {
+        e.preventDefault()
+        startDrawing(e)
+      }
+    }
+
+    const handleTouchMove = (e) => {
+      if (e.target === canvas) {
+        e.preventDefault()
+        draw(e)
+      }
+    }
+
+    const handleTouchEnd = (e) => {
+      if (e.target === canvas) {
+        e.preventDefault()
+        stopDrawing(e)
+      }
+    }
+
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false })
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false })
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false })
+
+    return () => {
+      canvas.removeEventListener('touchstart', handleTouchStart)
+      canvas.removeEventListener('touchmove', handleTouchMove)
+      canvas.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [isDrawing, currentTool, currentColor, brushSize, lastPos, isMyTurn])
+
+  useEffect(() => {
+    if (!stompClient) return
+
+    const subs = []
+
+    subs.push(stompClient.subscribe(`/topic/room/${roomId}/draw`, (msg) => {
+      const data = JSON.parse(msg.body)
+      if (data.type === 'CLEAR') {
+        drawHistory.current = []
+      } else {
+        drawHistory.current.push(data)
+      }
+      renderDrawing(data)
+    }))
+
+    subs.push(stompClient.subscribe(`/topic/room/${roomId}/chat`, (msg) => {
+      const chatMsg = JSON.parse(msg.body)
+      setMessages(prev => [...prev, chatMsg])
+    }))
+
+    subs.push(stompClient.subscribe(`/topic/room/${roomId}/state`, (msg) => {
+      const state = JSON.parse(msg.body)
+      setGameState(state)
+      setShowGameOver(state.gameOver || false)
+      
+      if (state.currentDrawerSessionId === mySessionId && 
+          !state.wordChosen && 
+          state.wordChoices && 
+          state.wordChoices.length > 0) {
+        setShowWordChoice(true)
+      } else {
+        setShowWordChoice(false)
+      }
+      
+      if ((state.isGameRunning || state.gameRunning) && state.roundTime !== undefined) {
+        setTimer(state.roundTime)
+      }
+    }))
+
+    subs.push(stompClient.subscribe(`/topic/room/${roomId}/time`, (msg) => {
+      setTimer(parseInt(msg.body))
+    }))
+
+    subs.push(stompClient.subscribe('/user/queue/draw', (msg) => {
+      const data = JSON.parse(msg.body)
+      if (data.type === 'CLEAR') {
+        drawHistory.current = []
+      } else {
+        drawHistory.current.push(data)
+      }
+      renderDrawing(data)
+    }))
+
+    return () => subs.forEach(s => s.unsubscribe())
+  }, [stompClient, roomId])
+
+  const getCoordinates = (e) => {
     const canvas = canvasRef.current
     const rect = canvas.getBoundingClientRect()
-    let x = e.clientX - rect.left
-    let y = e.clientY - rect.top
     
-    // Clamp coordinates within displayed canvas bounds
+    let clientX, clientY
+    
+    if (e.touches && e.touches.length > 0) {
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+    } else {
+      clientX = e.clientX
+      clientY = e.clientY
+    }
+
+    let x = clientX - rect.left
+    let y = clientY - rect.top
+    
     x = Math.max(0, Math.min(x, rect.width))
     y = Math.max(0, Math.min(y, rect.height))
     
-    // Scale to internal canvas coordinates
     const canvasX = (x / rect.width) * canvas.width
     const canvasY = (y / rect.height) * canvas.height
+    
+    return { canvasX, canvasY }
+  }
+
+  const startDrawing = (e) => {
+    if (!isMyTurn) return
+
+
+    const { canvasX, canvasY } = getCoordinates(e)
 
     setIsDrawing(true)
     setLastPos({ x: canvasX, y: canvasY })
   }
 
-  // Mouse move - draw
-  const handleMouseMove = (e) => {
+  const draw = (e) => {
     if (!isMyTurn) return
 
-    const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-    let x = e.clientX - rect.left
-    let y = e.clientY - rect.top
+    const { canvasX, canvasY } = getCoordinates(e)
     
-    // Clamp coordinates within displayed canvas bounds
-    x = Math.max(0, Math.min(x, rect.width))
-    y = Math.max(0, Math.min(y, rect.height))
-    
-    // Scale to internal canvas coordinates
-    const canvasX = (x / rect.width) * canvas.width
-    const canvasY = (y / rect.height) * canvas.height
-    
-    // If not drawing yet but mouse is down (re-entering canvas), start from this point
-    if (!isDrawing && e.buttons === 1) {
+    if (!isDrawing && (e.buttons === 1 || e.type === 'touchmove')) {
       setIsDrawing(true)
       setLastPos({ x: canvasX, y: canvasY })
       return
@@ -257,7 +322,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     
     if (!isDrawing) return
 
-    // Draw locally using scaled canvas coordinates
+    const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     ctx.beginPath()
     ctx.moveTo(lastPos.x, lastPos.y)
@@ -268,7 +333,6 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     ctx.lineJoin = 'round'
     ctx.stroke()
 
-    // Normalize and send to server (clamp to 0-1000 range)
     const prevX = Math.max(0, Math.min(1000, Math.round((lastPos.x / canvas.width) * 1000)))
     const prevY = Math.max(0, Math.min(1000, Math.round((lastPos.y / canvas.height) * 1000)))
     const currX = Math.max(0, Math.min(1000, Math.round((canvasX / canvas.width) * 1000)))
@@ -287,12 +351,10 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     setLastPos({ x: canvasX, y: canvasY })
   }
 
-  // Mouse up - stop drawing
-  const handleMouseUp = () => {
+  const stopDrawing = (e) => {
     setIsDrawing(false)
   }
 
-  // Send chat message
   const handleSendMessage = () => {
     if (!chatInput.trim() || isMyTurn) return
 
@@ -305,14 +367,12 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     setChatInput('')
   }
 
-  // Copy room code to clipboard
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomId)
     setCopiedCode(true)
     setTimeout(() => setCopiedCode(false), 2000)
   }
 
-  // Start game
   const handleStartGame = () => {
     if (!stompClient || !stompClient.connected) {
       alert('Connection lost. Please refresh and try again.')
@@ -325,7 +385,6 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     }
   }
 
-  // Clear canvas
   const handleClearCanvas = () => {
     if (!isMyTurn) return
 
@@ -337,7 +396,6 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
     stompClient.send(`/app/draw/${roomId}`, {}, JSON.stringify({ type: 'CLEAR' }))
   }
 
-  // Get round info
   const getRoundInfo = () => {
     if (!gameState?.currentRound) return 'Waiting...'
     const maxRounds = gameState.totalRounds || gameState.maxRounds || '?'
@@ -345,458 +403,343 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
   }
 
   return (
-    <div className="flex h-screen w-full flex-col bg-gray-50">
-      {/* Enhanced Header */}
+    <div className="flex h-[100dvh] w-full flex-col bg-gray-50 overflow-hidden select-none overscroll-none">
       <motion.header 
-        className="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-6 shadow-sm"
+        className="flex h-14 lg:h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6 shadow-sm shrink-0 z-20"
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.4 }}
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 lg:gap-4">
           <motion.button 
             onClick={onBack}
-            whileHover={{ scale: 1.05, x: -3 }}
             whileTap={{ scale: 0.95 }}
-            className="flex items-center gap-2 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
+            className="flex items-center gap-2 rounded-lg bg-gray-100 p-2 lg:px-3 lg:py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
           >
-            <ArrowLeft size={16} />
-            Back
+            <ArrowLeft size={18} />
+            <span className="hidden lg:inline">Back</span>
           </motion.button>
-          <span className="flex items-center gap-2 text-lg font-bold text-gray-900">
-            <Trophy size={20} className="text-amber-500" />
-            {getRoundInfo()}
-          </span>
-          <AnimatePresence>
-            {isMyTurn && gameState?.isGameRunning && (
-              <motion.span 
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0, opacity: 0 }}
-                className="flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700"
-              >
-                <Pen size={12} />
-                YOUR TURN!
-              </motion.span>
-            )}
-          </AnimatePresence>
+          
+          <div className="flex items-center gap-2">
+            <Trophy size={18} className="text-amber-500" />
+            <span className="text-sm lg:text-lg font-bold text-gray-900">
+              {getRoundInfo()}
+            </span>
+          </div>
         </div>
         
-        <div className="flex flex-1 justify-center">
-          <div className="rounded-xl bg-gray-100 px-8 py-2 text-center">
+        <div className="flex flex-1 justify-center mx-2">
+          <div className="rounded-xl bg-gray-100 px-4 py-1 lg:px-8 lg:py-2 text-center truncate max-w-[150px] lg:max-w-none">
             {isMyTurn ? (
-              <span className="text-2xl font-bold tracking-[0.2em] text-indigo-600">{gameState?.currentWord || 'LOADING...'}</span>
+              <span className="text-lg lg:text-2xl font-bold tracking-widest text-indigo-600 truncate">
+                {gameState?.currentWord || '...'}
+              </span>
             ) : (
-              <span className="text-2xl font-bold tracking-[0.5em] text-gray-800">{gameState?.hintWord || '_ _ _ _ _'}</span>
+              <span className="text-lg lg:text-2xl font-bold tracking-[0.3em] text-gray-800 truncate">
+                {gameState?.hintWord || '_ _ _'}
+              </span>
             )}
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.2 }}
-            className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1"
-          >
+        <div className="flex items-center gap-2 lg:gap-4">
+          <div className="hidden lg:flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1">
             <span className="text-xs font-bold text-amber-700">ROOM</span>
             <span className="font-mono text-base font-bold text-amber-600">{roomId}</span>
-            <motion.button
-              onClick={copyRoomCode}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              className={cn(
-                "flex items-center gap-1 rounded px-2 py-0.5 text-xs font-bold text-white transition-colors",
-                copiedCode ? "bg-emerald-500" : "bg-blue-500 hover:bg-blue-600"
-              )}
-            >
-              {copiedCode ? <Check size={12} /> : <Copy size={12} />}
-              {copiedCode ? 'Copied' : 'Copy'}
-            </motion.button>
-          </motion.div>
+            <button onClick={copyRoomCode} className="ml-2">
+              {copiedCode ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} className="text-amber-600" />}
+            </button>
+          </div>
+
           <motion.div 
-            animate={{ 
-              scale: timer <= 10 ? [1, 1.1, 1] : 1,
-            }}
-            transition={{ 
-              duration: 0.5,
-              repeat: timer <= 10 ? Infinity : 0
-            }}
+            animate={{ scale: timer <= 10 ? [1, 1.1, 1] : 1 }}
+            transition={{ duration: 0.5, repeat: timer <= 10 ? Infinity : 0 }}
             className={cn(
-              "flex items-center gap-2 rounded-lg px-3 py-1.5 font-bold text-white shadow-md transition-colors",
+              "flex items-center gap-1.5 rounded-lg px-2 py-1 lg:px-3 lg:py-1.5 font-bold text-white shadow-md",
               timer <= 10 ? "bg-red-500" : "bg-blue-500"
             )}
           >
-            <Clock size={18} />
-            <span className="text-lg">{timer}</span>
+            <Clock size={16} />
+            <span className="text-base lg:text-lg">{timer}</span>
           </motion.div>
         </div>
       </motion.header>
 
-      {/* Main Game Layout - Optimized */}
-      <main className="flex flex-1 gap-4 overflow-hidden p-4">
-        {/* Enhanced Left Panel - Players */}
-        <motion.aside 
-          className="flex w-64 flex-col rounded-xl bg-white shadow-sm ring-1 ring-gray-200"
-          initial={{ x: -50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-        >
-          <div className="flex items-center justify-center gap-2 border-b border-gray-100 p-3 text-sm font-bold text-gray-700">
+      <main className="flex-1 relative overflow-hidden lg:p-4 lg:flex lg:gap-4">
+        
+        <div className={cn(
+          "absolute inset-0 lg:static lg:w-64 lg:flex flex-col bg-white lg:rounded-xl lg:shadow-sm lg:ring-1 lg:ring-gray-200 z-10",
+          activeTab === 'rank' ? 'flex' : 'hidden lg:flex'
+        )}>
+          <div className="flex items-center justify-center gap-2 border-b border-gray-100 p-3 text-sm font-bold text-gray-700 shrink-0">
             <Users size={16} />
             Players ({gameState?.players?.length || 0})
           </div>
           <div className="flex-1 overflow-y-auto p-2">
-            <AnimatePresence>
-              {gameState?.players && gameState.players.length > 0 ? (
-                gameState.players.sort((a, b) => b.score - a.score).map((player, idx) => (
-                  <motion.div 
-                    key={player.sessionId} 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ delay: idx * 0.05, duration: 0.3 }}
-                    className={cn(
-                      "mb-1.5 flex items-center gap-2 rounded-lg p-2 transition-all",
-                      player.sessionId === mySessionId ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50",
-                      player.sessionId === gameState.currentDrawerSessionId && "ring-2 ring-amber-400"
-                    )}
-                  >
-                    <span className={cn(
-                      "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
-                      idx === 0 ? "bg-yellow-100 text-yellow-700" : 
-                      idx === 1 ? "bg-gray-200 text-gray-700" : 
-                      idx === 2 ? "bg-orange-100 text-orange-700" : "bg-gray-100 text-gray-500"
-                    )}>
-                      {idx + 1}
-                    </span>
-                    <div className="flex-1 overflow-hidden">
-                      <div className="truncate text-sm font-bold text-gray-900">{player.username}</div>
-                      <div className="text-xs font-medium text-gray-500">{player.score} pts</div>
-                    </div>
-                    {player.sessionId === gameState.currentDrawerSessionId && (
-                      <motion.span 
-                        animate={{ rotate: [0, 15, -15, 0] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                        className="text-lg"
-                      >
-                        ✏️
-                      </motion.span>
-                    )}
-                  </motion.div>
-                ))
-              ) : (
-                <div className="p-4 text-center text-sm text-gray-400">Loading players...</div>
-              )}
-            </AnimatePresence>
+            {gameState?.players?.sort((a, b) => b.score - a.score).map((player, idx) => (
+              <div 
+                key={player.sessionId} 
+                className={cn(
+                  "mb-1.5 flex items-center gap-2 rounded-lg p-2",
+                  player.sessionId === mySessionId ? "bg-blue-50 ring-1 ring-blue-200" : "bg-gray-50",
+                  player.sessionId === gameState.currentDrawerSessionId && "ring-2 ring-amber-400"
+                )}
+              >
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-xs font-bold text-gray-700">
+                  {idx + 1}
+                </span>
+                <div className="flex-1 overflow-hidden">
+                  <div className="truncate text-sm font-bold text-gray-900">{player.username}</div>
+                  <div className="text-xs font-medium text-gray-500">{player.score} pts</div>
+                </div>
+                {player.sessionId === gameState.currentDrawerSessionId && <span>✏️</span>}
+              </div>
+            ))}
           </div>
-        </motion.aside>
+        </div>
 
-        {/* Center Panel - Canvas */}
-        <section className="flex flex-1 flex-col gap-4">
-          <div className="relative flex-1 overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-200">
+        <div className={cn(
+          "absolute inset-0 lg:static lg:flex-1 flex flex-col gap-2 lg:gap-4 z-0",
+          activeTab === 'canvas' ? 'flex' : 'hidden lg:flex'
+        )}>
+          <div className="relative flex-1 bg-white lg:rounded-2xl lg:shadow-sm lg:ring-1 lg:ring-gray-200 overflow-hidden touch-none">
             <canvas
               ref={canvasRef}
-              className="h-full w-full cursor-crosshair touch-none"
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
+              className="h-full w-full cursor-crosshair touch-none block"
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+              style={{ touchAction: 'none' }}
             />
+            
             {(!gameState?.isGameRunning && !gameState?.gameRunning && !gameState?.currentDrawerSessionId) && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 backdrop-blur-sm">
-                <div className="flex max-w-md flex-col items-center gap-8 p-8 text-center">
-                  <h2 className="text-3xl font-extrabold text-gray-900">WAITING TO START...</h2>
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/95 backdrop-blur-sm p-4">
+                <div className="flex w-full max-w-md flex-col items-center gap-6 text-center">
+                  <h2 className="text-2xl lg:text-3xl font-extrabold text-gray-900">WAITING...</h2>
                   
-                  <div className="rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50 p-8">
-                    <div className="mb-4 text-sm font-bold text-amber-800">Share this code with friends:</div>
-                    <div className="flex items-center justify-center gap-4">
-                      <span className="font-mono text-5xl font-black tracking-widest text-amber-600">{roomId}</span>
+                  <div className="w-full rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 p-6">
+                    <div className="mb-2 text-xs font-bold text-amber-800 uppercase">Room Code</div>
+                    <div className="flex items-center justify-center gap-3">
+                      <span className="font-mono text-4xl font-black tracking-widest text-amber-600">{roomId}</span>
                       <button
                         onClick={copyRoomCode}
-                        className={cn(
-                          "rounded-lg px-4 py-2 text-sm font-bold text-white transition-all",
-                          copiedCode ? "bg-emerald-500" : "bg-blue-500 hover:bg-blue-600"
-                        )}
+                        className="rounded-lg bg-blue-500 p-2 text-white hover:bg-blue-600"
                       >
-                        {copiedCode ? '✓ Copied!' : '📋 Copy'}
+                        {copiedCode ? <Check size={20} /> : <Copy size={20} />}
                       </button>
                     </div>
                   </div>
 
                   <div className="font-medium text-gray-500">
-                    {gameState?.players?.length || 0} player(s) in room
+                    {gameState?.players?.length || 0} player(s) ready
                   </div>
 
-                  <motion.button
+                  <button
                     onClick={handleStartGame}
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center gap-3 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 px-12 py-4 text-xl font-bold text-white shadow-lg shadow-emerald-500/30 transition-all hover:from-emerald-400 hover:to-emerald-500"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 py-3 text-lg font-bold text-white shadow-lg active:scale-95"
                   >
-                    <Play size={24} fill="currentColor" />
+                    <Play size={20} fill="currentColor" />
                     START GAME
-                  </motion.button>
+                  </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Enhanced Drawing Tools - Optimized */}
-          <AnimatePresence>
-            {isMyTurn && (
-              <motion.div 
-                className="flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm ring-1 ring-gray-200"
-                initial={{ y: 50, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 50, opacity: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                {/* Tools Section */}
-                <div className="flex items-center gap-2">
-                  <motion.button
+          {isMyTurn && (
+            <div className="shrink-0 bg-white p-2 lg:p-3 lg:rounded-xl lg:shadow-sm lg:ring-1 lg:ring-gray-200 overflow-x-auto">
+              <div className="flex items-center gap-3 min-w-max px-2">
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                  <button
                     onClick={() => setCurrentTool('pen')}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
-                      currentTool === 'pen' ? "bg-blue-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    )}
+                    className={cn("p-2 rounded-md", currentTool === 'pen' ? "bg-white shadow-sm text-blue-600" : "text-gray-500")}
                   >
-                    <Pen size={14} /> Pen
-                  </motion.button>
-                  <motion.button
+                    <Pen size={18} />
+                  </button>
+                  <button
                     onClick={() => setCurrentTool('eraser')}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
-                      currentTool === 'eraser' ? "bg-red-500 text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    )}
+                    className={cn("p-2 rounded-md", currentTool === 'eraser' ? "bg-white shadow-sm text-red-600" : "text-gray-500")}
                   >
-                    <Eraser size={14} /> Eraser
-                  </motion.button>
-                  <motion.button
-                    onClick={handleClearCanvas}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-600 transition-all hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 size={14} /> Clear
-                  </motion.button>
+                    <Eraser size={18} />
+                  </button>
+                  <button onClick={handleClearCanvas} className="p-2 rounded-md text-gray-500 hover:text-red-600">
+                    <Trash2 size={18} />
+                  </button>
                 </div>
 
-                <div className="h-8 w-px bg-gray-200" />
+                <div className="w-px h-8 bg-gray-200" />
 
-                {/* Colors Section - Compact Grid */}
-                <div className="flex-1 min-w-0">
-                  <div className="grid grid-cols-10 gap-1">
-                    {colorPalette.map((color) => (
-                      <motion.button
-                        key={color}
-                        onClick={() => { setCurrentColor(color); setCurrentTool('pen'); }}
-                        whileHover={{ scale: 1.15 }}
-                        whileTap={{ scale: 0.9 }}
-                        className={cn(
-                          "h-7 w-7 rounded-full border-2 transition-all",
-                          currentColor === color && currentTool === 'pen' ? "border-gray-900 scale-105" : "border-transparent hover:border-gray-300"
-                        )}
-                        style={{ backgroundColor: color }}
-                      />
-                    ))}
-                  </div>
+                <div className="grid grid-rows-2 grid-flow-col gap-0.5 bg-gray-200 p-1 rounded-lg">
+                  {colorPalette.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => { setCurrentColor(color); setCurrentTool('pen'); }}
+                      className={cn(
+                        "w-6 h-6 rounded-sm border border-gray-300 hover:scale-110 transition-transform",
+                        currentColor === color && currentTool === 'pen' ? "ring-2 ring-gray-900 z-10" : ""
+                      )}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
                 </div>
 
-                <div className="h-8 w-px bg-gray-200" />
+                <div className="w-px h-8 bg-gray-200" />
 
-                {/* Size Section - Compact */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                   {brushSizes.map((size) => (
-                    <motion.button
+                    <button
                       key={size}
                       onClick={() => setBrushSize(size)}
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
                       className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-lg transition-all",
-                        brushSize === size ? "bg-blue-100 ring-2 ring-blue-500" : "bg-gray-100 hover:bg-gray-200"
-                        )}
-                      >
-                        <div 
-                          className="rounded-full bg-gray-900"
-                          style={{ width: size / 2.5, height: size / 2.5 }}
-                        />
-                      </motion.button>
-                    ))}
+                        "w-7 h-7 flex items-center justify-center rounded-md",
+                        brushSize === size ? "bg-blue-100 ring-1 ring-blue-500" : "bg-gray-50"
+                      )}
+                    >
+                      <div className="rounded-full bg-gray-900" style={{ width: size / 2, height: size / 2 }} />
+                    </button>
+                  ))}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </section>
+              </div>
+            </div>
+          )}
+        </div>
 
-        {/* Enhanced Right Panel - Chat */}
-        <motion.aside 
-          className="flex w-80 flex-col rounded-2xl bg-white shadow-sm ring-1 ring-gray-200"
-          initial={{ x: 50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          transition={{ delay: 0.3, duration: 0.4 }}
-        >
-          <div className="flex items-center justify-center gap-2 border-b border-gray-100 p-4 font-bold text-gray-700">
+        <div className={cn(
+          "absolute inset-0 lg:static lg:w-80 lg:flex flex-col bg-white lg:rounded-2xl lg:shadow-sm lg:ring-1 lg:ring-gray-200 z-10",
+          activeTab === 'chat' ? 'flex' : 'hidden lg:flex'
+        )}>
+          <div className="flex items-center justify-center gap-2 border-b border-gray-100 p-3 font-bold text-gray-700 shrink-0">
             <MessageSquare size={18} />
             Chat
           </div>
+          <div className="flex items-center justify-center gap-2 border-b border-gray-100 px-3 py-2 bg-amber-50 shrink-0">
+            <span className="text-[10px] font-bold text-amber-700">ROOM CODE:</span>
+            <span className="font-mono text-sm font-bold text-amber-600">{roomId}</span>
+            <button onClick={copyRoomCode} className="ml-1 active:scale-95">
+              {copiedCode ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} className="text-amber-600" />}
+            </button>
+          </div>
           <div className="flex-1 overflow-y-auto bg-gray-50 p-3">
-            <div className="flex flex-col gap-1.5">
-              <AnimatePresence initial={false}>
-                {messages.map((msg, idx) => (
-                  <motion.div 
-                    key={idx} 
-                    initial={{ opacity: 0, x: 20, scale: 0.9 }}
-                    animate={{ opacity: 1, x: 0, scale: 1 }}
-                    className={cn(
-                      "rounded-lg px-2.5 py-1.5 text-xs shadow-sm",
-                      msg.type === 'SYSTEM' ? "bg-blue-50 text-blue-800 border border-blue-100" : 
-                      msg.type === 'GUESS_CORRECT' ? "bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold" : 
-                      "bg-white text-gray-800 border border-gray-100"
-                    )}
-                  >
-                    {msg.type !== 'SYSTEM' && <span className="font-bold text-indigo-600">{msg.sender}: </span>}
-                    <span>{msg.content}</span>
-                  </motion.div>
-                ))}
-              </AnimatePresence>
+            <div className="flex flex-col gap-2">
+              {messages.map((msg, idx) => (
+                <div 
+                  key={idx} 
+                  className={cn(
+                    "rounded-lg px-3 py-2 text-sm shadow-sm",
+                    msg.type === 'SYSTEM' ? "bg-blue-50 text-blue-800 border border-blue-100 text-center text-xs" : 
+                    msg.type === 'GUESS_CORRECT' ? "bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold text-center" : 
+                    "bg-white text-gray-800 border border-gray-100"
+                  )}
+                >
+                  {msg.type !== 'SYSTEM' && msg.type !== 'GUESS_CORRECT' && (
+                    <span className="font-bold text-indigo-600 block text-xs mb-0.5">{msg.sender}</span>
+                  )}
+                  <span>{msg.content}</span>
+                </div>
+              ))}
               <div ref={messagesEndRef} />
             </div>
           </div>
-          <div className="border-t border-gray-100 p-3">
+          <div className="border-t border-gray-100 p-3 shrink-0">
             <input
               id="chat-input"
               type="text"
-              placeholder={isMyTurn ? "You can't guess!" : "Type your guess..."}
+              placeholder={isMyTurn ? "You can't guess!" : "Type guess..."}
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               disabled={isMyTurn}
               className={cn(
-                "w-full rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium outline-none transition-all",
-                isMyTurn ? "cursor-not-allowed opacity-50" : "focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-500/10"
+                "w-full rounded-xl border-2 border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium outline-none transition-all",
+                isMyTurn ? "cursor-not-allowed opacity-50" : "focus:border-indigo-500 focus:bg-white"
               )}
             />
           </div>
-        </motion.aside>
+        </div>
       </main>
 
-      {/* Word Choice Modal for Drawer */}
+      <nav className="lg:hidden flex items-center justify-around bg-white border-t border-gray-200 px-2 py-2 shrink-0 z-30 pb-safe">
+        <button 
+          onClick={() => setActiveTab('rank')}
+          className={cn("flex flex-col items-center p-2 rounded-lg", activeTab === 'rank' ? "text-indigo-600 bg-indigo-50" : "text-gray-500")}
+        >
+          <Users size={20} />
+          <span className="text-[10px] font-bold mt-1">Rank</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('canvas')}
+          className={cn("flex flex-col items-center p-2 rounded-lg", activeTab === 'canvas' ? "text-indigo-600 bg-indigo-50" : "text-gray-500")}
+        >
+          <Palette size={20} />
+          <span className="text-[10px] font-bold mt-1">Draw</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('chat')}
+          className={cn("flex flex-col items-center p-2 rounded-lg", activeTab === 'chat' ? "text-indigo-600 bg-indigo-50" : "text-gray-500")}
+        >
+          <div className="relative">
+            <MessageSquare size={20} />
+          </div>
+          <span className="text-[10px] font-bold mt-1">Chat</span>
+        </button>
+      </nav>
+
       <AnimatePresence>
         {showWordChoice && gameState?.wordChoices && (
           <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <motion.div 
-              className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            >
-              <div className="mb-4 text-center">
-                <h2 className="text-2xl font-bold text-gray-900 mb-1">
-                  Choose Your Word
-                </h2>
-                <p className="text-sm text-gray-500">
-                  Select a word and start drawing
-                </p>
-              </div>
-              <div className="space-y-2">
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+              <h2 className="text-xl font-bold text-center mb-4">Choose a Word</h2>
+              <div className="flex flex-col gap-3">
                 {gameState.wordChoices.map((word, idx) => (
-                  <motion.button
+                  <button
                     key={idx}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    whileHover={{ scale: 1.02, x: 4 }}
-                    whileTap={{ scale: 0.98 }}
                     onClick={() => {
                       stompClient.send(`/app/chooseWord/${roomId}`, {}, JSON.stringify({ word }))
                       setShowWordChoice(false)
                     }}
-                    className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-lg font-semibold text-white shadow-md transition-all hover:shadow-lg"
+                    className="w-full rounded-xl bg-indigo-600 py-3 text-lg font-bold text-white shadow-md active:scale-95"
                   >
                     {word}
-                  </motion.button>
+                  </button>
                 ))}
               </div>
-            </motion.div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Enhanced Game Over Modal */}
       <AnimatePresence>
         {showGameOver && (
           <motion.div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
           >
-            <motion.div 
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              transition={{ type: "spring", stiffness: 300, damping: 25 }}
-            >
-              <h1 className="mb-4 text-center text-2xl font-bold text-gray-900">
-                Game Over
-              </h1>
-              <div className="mb-4">
-                <h2 className="mb-3 flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  <Trophy size={16} />
-                  Final Scores
-                </h2>
-                <div className="space-y-1.5">
-                  {gameState?.players?.sort((a, b) => b.score - a.score).map((player, idx) => (
-                    <motion.div 
-                      key={player.sessionId} 
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.2 + idx * 0.08, duration: 0.3 }}
-                      whileHover={{ x: 4 }}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg p-3 transition-all",
-                        idx === 0 ? "bg-gradient-to-r from-amber-50 to-yellow-50 border-2 border-amber-200" : 
-                        idx === 1 ? "bg-gradient-to-r from-gray-50 to-slate-50 border border-gray-200" :
-                        idx === 2 ? "bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200" :
-                        "bg-gray-50 border border-gray-100"
-                      )}
-                    >
-                      <span className={cn(
-                        "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold",
-                        idx === 0 ? "bg-amber-500 text-white" :
-                        idx === 1 ? "bg-gray-400 text-white" :
-                        idx === 2 ? "bg-orange-400 text-white" :
-                        "bg-gray-300 text-gray-700"
-                      )}>
-                        {idx + 1}
-                      </span>
-                      <span className="flex-1 text-sm font-semibold text-gray-900">{player.username}</span>
-                      <span className="font-bold text-indigo-600">{player.score}</span>
-                    </motion.div>
-                  ))}
-                </div>
+            <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl text-center">
+              <h1 className="text-2xl font-bold mb-4">Game Over!</h1>
+              <div className="space-y-2 mb-6">
+                {gameState?.players?.sort((a, b) => b.score - a.score).slice(0, 3).map((player, idx) => (
+                  <div key={player.sessionId} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-500">#{idx + 1}</span>
+                      <span className="font-bold">{player.username}</span>
+                    </div>
+                    <span className="font-bold text-indigo-600">{player.score}</span>
+                  </div>
+                ))}
               </div>
-              <motion.button 
+              <button 
                 onClick={onBack}
-                whileHover={{ scale: 1.01 }}
-                whileTap={{ scale: 0.99 }}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-gray-800"
+                className="w-full rounded-xl bg-gray-900 py-3 text-white font-bold"
               >
-                <ArrowLeft size={16} />
                 Back to Menu
-              </motion.button>
-            </motion.div>
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

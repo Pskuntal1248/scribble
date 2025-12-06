@@ -17,6 +17,8 @@ import {
 } from 'lucide-react'
 import { cn } from '../lib/utils'
 
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
+
 export default function LobbyScreen({ stompClient, username, mySessionId, onBack, onJoinRoom }) {
   const [lobbies, setLobbies] = useState([])
   const [lobbyCode, setLobbyCode] = useState('')
@@ -26,7 +28,6 @@ export default function LobbyScreen({ stompClient, username, mySessionId, onBack
   const [drawTime, setDrawTime] = useState(120)
   const [rounds, setRounds] = useState(4)
   const [maxPlayers, setMaxPlayers] = useState(24)
-  const [ipLimit, setIpLimit] = useState(2)
   const [customWords, setCustomWords] = useState(3)
 
   useEffect(() => {
@@ -34,7 +35,7 @@ export default function LobbyScreen({ stompClient, username, mySessionId, onBack
   }, [])
 
   const refreshLobbies = () => {
-    fetch('http://localhost:8080/api/lobby/list')
+    fetch(`${BACKEND_URL}/api/lobby/list`)
       .then(res => res.json())
       .then(data => {
         setLobbies(data)
@@ -56,7 +57,7 @@ export default function LobbyScreen({ stompClient, username, mySessionId, onBack
         drawingTime: drawTime,
         rounds: rounds,
         maxPlayers: maxPlayers,
-        playersPerIpLimit: ipLimit,
+        playersPerIpLimit: 999,
         customWordsPerTurn: customWords,
         customWords: [],
         isPrivate: isPrivate,
@@ -160,7 +161,6 @@ export default function LobbyScreen({ stompClient, username, mySessionId, onBack
               { label: 'Drawing Time', icon: Clock, value: drawTime, setter: setDrawTime, min: 30, max: 300, step: 10 },
               { label: 'Rounds', icon: Zap, value: rounds, setter: setRounds, min: 1, max: 10, step: 1 },
               { label: 'Max Players', icon: Users, value: maxPlayers, setter: setMaxPlayers, min: 2, max: 50, step: 2 },
-              { label: 'Players per IP', icon: Hash, value: ipLimit, setter: setIpLimit, min: 1, max: 10, step: 1 },
               { label: 'Custom Words', icon: null, emoji: '✏️', value: customWords, setter: setCustomWords, min: 0, max: 5, step: 1 },
             ].map((setting, idx) => (
               <div key={idx} className="flex items-center justify-between rounded-lg border border-gray-100 p-3">

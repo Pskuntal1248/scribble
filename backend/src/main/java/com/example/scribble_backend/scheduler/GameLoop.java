@@ -25,8 +25,8 @@ public class GameLoop {
     
     @Scheduled(fixedRate = 300000) 
     public void cleanupInactiveRooms() {
-        long publicThreshold = 15 * 60 * 1000;  // 15 minutes
-        long privateThreshold = 60 * 60 * 1000; // 60 minutes
+        long publicThreshold = 5 * 60 * 1000;  // 15 minutes
+        long privateThreshold = 15 * 60 * 1000; // 60 minutes
         
         gameService.cleanupInactiveRooms(publicThreshold, privateThreshold);
     }
@@ -39,11 +39,9 @@ public class GameLoop {
                
                 room.setRoundTime(room.getRoundTime() - 1);
 
-                // Dynamic hint system - check if current time matches any hint time
-                if (room.getHintTimes() != null && !room.getHintTimes().isEmpty()) {
+                if (room.isWordChosen() && room.getHintTimes() != null && !room.getHintTimes().isEmpty()) {
                     int currentTime = room.getRoundTime();
                     
-                    // Check if we should reveal a hint at this time
                     if (room.getHintTimes().contains(currentTime) && room.getHintsRevealed() < room.getHintTimes().size()) {
                         revealRandomLetter(room);
                         room.setHintsRevealed(room.getHintsRevealed() + 1);
@@ -60,16 +58,27 @@ public class GameLoop {
                 
         
                 if (room.getRoundTime() == 0) {
-                    String oldWord = room.getCurrentWord();
-               
-                    ChatMessage timeUpMsg = ChatMessage.builder()
-                            .type(ChatMessage.MessageType.SYSTEM)
-                            .sender("System")
-                            .content("Time's up! Word was: " + oldWord)
-                            .build();
-                    messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", timeUpMsg);
-                    
-                    endRoundAndStartNext(room);
+                    if (!room.isWordChosen()) {
+                        if (room.getWordChoices() != null && !room.getWordChoices().isEmpty()) {
+                            String randomWord = room.getWordChoices().get(new Random().nextInt(room.getWordChoices().size()));
+                            gameService.chooseWord(room.getRoomId(), room.getCurrentDrawerSessionId(), randomWord);
+                            
+                            messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
+                        } else {
+                            endRoundAndStartNext(room);
+                        }
+                    } else {
+                        String oldWord = room.getCurrentWord();
+                
+                        ChatMessage timeUpMsg = ChatMessage.builder()
+                                .type(ChatMessage.MessageType.SYSTEM)
+                                .sender("System")
+                                .content("Time's up! Word was: " + oldWord)
+                                .build();
+                        messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", timeUpMsg);
+                        
+                        endRoundAndStartNext(room);
+                    }
                 }
             }
         }
@@ -125,6 +134,12 @@ public class GameLoop {
                     .content("🎉 GAME OVER! Winner: " + getWinner(room))
                     .build();
             messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", gameOverMsg);
+            
+            messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
+            
+            try { Thread.sleep(10000); } catch (InterruptedException e) { }
+            gameService.removeRoom(room.getRoomId());
+            return;
         }
         
     

@@ -89,6 +89,9 @@ public class GameController {
                     .build();
             messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/chat", joinMsg);
             
+            // Force a small delay to ensure client subscription before state update
+            try { Thread.sleep(100); } catch (InterruptedException e) {}
+            
             messagingTemplate.convertAndSend("/topic/room/" + room.getRoomId() + "/state", room);
 
             if ("join".equals(action) && !room.getDrawHistory().isEmpty()) {
@@ -96,6 +99,14 @@ public class GameController {
                     messagingTemplate.convertAndSendToUser(sessionId, "/queue/draw", stroke);
                 }
             }
+        } else {
+            // Send error if join failed (e.g. room full or IP limit)
+            ChatMessage errorMsg = ChatMessage.builder()
+                    .type(ChatMessage.MessageType.SYSTEM)
+                    .sender("System")
+                    .content("Cannot join: Room is full or IP limit reached.")
+                    .build();
+            messagingTemplate.convertAndSendToUser(sessionId, "/queue/errors", errorMsg);
         }
     }
 
@@ -115,7 +126,15 @@ public class GameController {
     public void handleChat(@DestinationVariable String roomId, @Payload ChatMessage message, SimpMessageHeaderAccessor headerAccessor) {
         String sessionId = headerAccessor.getSessionId();
         GameRoom room = gameService.getRoom(roomId);
-        if (room != null) room.updateActivity(); // Track activity
+        
+        if (room != null) {
+            room.updateActivity();
+            
+            // Ensure player is registered in the room
+            if (room.getPlayerBySessionId(sessionId) == null) {
+                return;
+            }
+        }
         
         boolean isCorrect = gameService.processGuess(roomId, message.getContent(), sessionId);
         
