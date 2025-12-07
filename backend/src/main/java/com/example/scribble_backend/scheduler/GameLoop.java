@@ -23,12 +23,16 @@ public class GameLoop {
     private SimpMessagingTemplate messagingTemplate;
 
     
-    @Scheduled(fixedRate = 300000) 
+    // Clean up inactive rooms every 2 minutes for free tier optimization
+    @Scheduled(fixedRate = 120000) 
     public void cleanupInactiveRooms() {
-        long publicThreshold = 5 * 60 * 1000;  // 15 minutes
-        long privateThreshold = 15 * 60 * 1000; // 60 minutes
+        long publicThreshold = 10 * 60 * 1000;  // 10 minutes (reduced for free tier)
+        long privateThreshold = 30 * 60 * 1000; // 30 minutes (reduced for free tier)
         
-        gameService.cleanupInactiveRooms(publicThreshold, privateThreshold);
+        int removed = gameService.cleanupInactiveRooms(publicThreshold, privateThreshold);
+        if (removed > 0) {
+            System.out.println("[Cleanup] Removed " + removed + " inactive rooms");
+        }
     }
     
     @Scheduled(fixedRate = 1000)

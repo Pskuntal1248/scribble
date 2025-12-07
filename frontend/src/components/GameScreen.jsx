@@ -26,6 +26,7 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
   const [showGameOver, setShowGameOver] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
   const [showWordChoice, setShowWordChoice] = useState(false)
+  const [connectionLost, setConnectionLost] = useState(false)
   
   const [activeTab, setActiveTab] = useState('canvas')
   const canvasRef = useRef(null)
@@ -38,6 +39,43 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 })
 
   const isMyTurn = gameState?.currentDrawerSessionId === mySessionId
+  
+  // Monitor WebSocket connection with reconnection attempts
+  useEffect(() => {
+    if (!stompClient) {
+      setConnectionLost(true)
+      return
+    }
+    
+    let missedHeartbeats = 0
+    
+    const checkConnection = setInterval(() => {
+      if (!stompClient.connected) {
+        missedHeartbeats++
+        
+        if (missedHeartbeats >= 2) {
+          setConnectionLost(true)
+        }
+      } else {
+        missedHeartbeats = 0
+        setConnectionLost(false)
+      }
+    }, 5000) // Check every 5 seconds
+    
+    // Ping to keep connection alive
+    const pingInterval = setInterval(() => {
+      if (stompClient.connected) {
+        try {
+          fetch(`${BACKEND_URL}/api/ping`).catch(() => {})
+        } catch (e) {}
+      }
+    }, 25000) // Ping every 25 seconds
+    
+    return () => {
+      clearInterval(checkConnection)
+      clearInterval(pingInterval)
+    }
+  }, [stompClient])
 
   const renderDrawing = (data) => {
     const canvas = canvasRef.current
@@ -404,6 +442,12 @@ export default function GameScreen({ stompClient, username, roomId, mySessionId,
 
   return (
     <div className="flex h-[100dvh] w-full flex-col bg-gray-50 overflow-hidden select-none overscroll-none">
+      {connectionLost && (
+        <div className="absolute top-0 left-0 right-0 bg-red-500 text-white text-center py-2 text-sm font-bold z-50 animate-pulse">
+          ⚠️ Connection Lost - Please refresh the page
+        </div>
+      )}
+      
       <motion.header 
         className="flex h-14 lg:h-16 items-center justify-between border-b border-gray-200 bg-white px-4 lg:px-6 shadow-sm shrink-0 z-20"
         initial={{ y: -50, opacity: 0 }}

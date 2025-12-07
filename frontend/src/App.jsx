@@ -18,10 +18,16 @@ function App() {
   const [mySessionId, setMySessionId] = useState('')
   const [connected, setConnected] = useState(false)
 
-  const connectWebSocket = (callback) => {
-    const socket = new SockJS(`${WS_URL}/ws`)
+  const connectWebSocket = (callback, retryCount = 0) => {
+    const socket = new SockJS(`${WS_URL}/ws`, null, {
+      timeout: 10000,
+      transports: ['websocket', 'xhr-streaming', 'xhr-polling']
+    })
     const client = Stomp.over(socket)
     client.debug = null
+    client.reconnect_delay = 5000
+    client.heartbeat.outgoing = 20000 // Match backend heartbeat
+    client.heartbeat.incoming = 20000
 
     client.connect({}, (frame) => {
       const url = socket._transport.url
@@ -31,10 +37,43 @@ function App() {
       setConnected(true)
       setStompClient(client)
       
+      // Ping server periodically to keep connection alive
+      const pingInterval = setInterval(() => {
+        if (client.connected) {
+          try {
+            fetch(`${BACKEND_URL}/api/ping`).catch(() => {})
+          } catch (e) {}
+        } else {
+          clearInterval(pingInterval)
+        }
+      }, 25000) // Ping every 25 seconds
+      
       if (callback) callback(client, sessionId)
-    }, () => {
-      alert('Failed to connect to server')
+    }, (error) => {
+      console.error('WebSocket connection error:', error)
+      
+      if (retryCount < 5) { // Increased to 5 attempts
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 15000)
+        console.log(`Retrying connection in ${delay}ms... (attempt ${retryCount + 1}/5)`)
+        setTimeout(() => connectWebSocket(callback, retryCount + 1), delay)
+      } else {
+        alert('Connection lost. Please refresh and try again.')
+      }
     })
+    
+    // Handle disconnect with reconnection attempt
+    socket.onclose = () => {
+      console.log('WebSocket closed')
+      setConnected(false)
+      
+      // Attempt to reconnect after 3 seconds
+      setTimeout(() => {
+        if (!client.connected) {
+          console.log('Attempting to reconnect...')
+          connectWebSocket(callback, 0)
+        }
+      }, 3000)
+    }
   }
 
   return (
