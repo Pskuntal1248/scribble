@@ -29,7 +29,7 @@ public class HttpHandshakeInterceptor implements HandshakeInterceptor {
                 ipAddress = httpRequest.getRemoteAddr();
             }
             
-            // Store IP in session attributes
+            
             attributes.put("IP_ADDRESS", ipAddress);
         }
         
@@ -39,6 +39,6 @@ public class HttpHandshakeInterceptor implements HandshakeInterceptor {
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {
-        // Nothing to do after handshake
+
     }
 }
