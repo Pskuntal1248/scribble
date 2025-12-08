@@ -5,6 +5,7 @@ import LobbyScreen from './components/LobbyScreen'
 import GameScreen from './components/GameScreen'
 import SockJS from 'sockjs-client'
 import Stomp from 'stompjs'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 // Get backend URL from environment variables or use localhost as fallback
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080'
@@ -122,6 +123,7 @@ function App() {
           }}
         />
       )}
+      <SpeedInsights />
     </>
   );
 }
