@@ -329,6 +329,25 @@ export default function LobbyScreen({ stompClient, username, mySessionId, onBack
             </div>
           </div>
         </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8, duration: 0.5 }}
+          className="absolute bottom-4 left-0 right-0 text-center"
+        >
+          <p className="text-xs text-gray-500">
+            Made with <span className="text-red-500">❤️</span> by{' '}
+            <a 
+              href="https://github.com/Pskuntal1248" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+            >
+              Parth Singh
+            </a>
+          </p>
+        </motion.div>
       </div>
     </motion.div>
   )
