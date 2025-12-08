@@ -119,6 +119,25 @@ export default function LoginScreen({ username, setUsername, onPlayClick }) {
                 </motion.div>
             </CardBody>
         </Card>
+        
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.8, duration: 0.5 }}
+          className="mt-6 text-center"
+        >
+          <p className="text-sm text-gray-600">
+            Made with <span className="text-red-500">❤️</span> by{' '}
+            <a 
+              href="https://github.com/Pskuntal1248" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+            >
+              Parth Singh
+            </a>
+          </p>
+        </motion.div>
       </motion.div>
     </div>
   )
